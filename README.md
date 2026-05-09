@@ -1,36 +1,119 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Braynr Visualizer
 
-## Getting Started
+> Read with a brain on your shoulder.
 
-First, run the development server:
+Drop in any text-tagged PDF. Braynr's agent reads it page by page, picks the
+concepts that benefit from a visual aid, and renders them right next to
+the text — 3D anatomy / molecules, animated 2D simulations, formula
+walkthroughs with KaTeX, plotted graphs, or live source citations.
+
+The agent is the locally-installed [Codex CLI](https://github.com/openai/codex)
+(`codex exec`), invoked through the official `@openai/codex-sdk` with a
+strict `outputSchema` per call so every response is typed JSON.
+
+---
+
+## Run it
+
+Pre-requisites:
+- Node 20+
+- An authenticated `codex` CLI (`codex login`) — the demo uses your local
+  ChatGPT or API account.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run generate-pdfs   # one-time: build the 5 sample PDFs into public/pdfs
+npm run dev             # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open the home page, drop a PDF (or click any of the 5 sample documents),
+and watch tags appear inline as the agent reads each page. Tags pulse
+while the visualization is being prepared, then become clickable.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## How it works
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+┌──────────────┐   POST /api/upload     ┌─────────────────────────────┐
+│  Browser     │ ─────────────────────► │  Server                     │
+│              │                        │   • saves PDF to /tmp       │
+│              │                        │   • pdfjs-dist extracts     │
+│              │ ◄─ {docId, pages…} ─── │     text + per-glyph bboxes │
+└──────────────┘                        └─────────────────────────────┘
+                                                  │
+   page renders, then                  per-page   ▼  per-tag
+   POST /api/analyze-pdf  ◄──── codex (low effort, JSON schema)
+   POST /api/generate-viz ◄──── codex (low effort, +web_search for legal)
+```
 
-## Learn More
+Detection is parallel (3 pages at a time). Visualization generation is
+parallel (4 tags at a time). The first ready tag is auto-selected so the
+right pane is never empty.
 
-To learn more about Next.js, take a look at the following resources:
+## The five render modes
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| type        | renderer                          | example pick                        |
+|-------------|-----------------------------------|-------------------------------------|
+| `3d`        | Three.js scene with auto-orbit    | heart, methane, brain               |
+| `2d-anim`   | Canvas2D, frame-by-frame draw     | inclined plane, blood flow, valves  |
+| `formula`   | KaTeX, headline + step derivation | F=ma, projectile equations          |
+| `graph`     | Custom Canvas chart               | range vs angle, bell curve          |
+| `2d-text`   | Markdown + cited sources          | Articolo 11, court rulings          |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Layout
 
-## Deploy on Vercel
+```
+app/
+  page.tsx                    landing + UploadCard
+  viewer/[docId]/page.tsx     main reader
+  api/
+    upload/                   POST PDF → docId + page metadata
+    pdf/[docId]/              GET raw PDF bytes
+    doc/[docId]/              GET parsed metadata
+    analyze-pdf/              POST page text → DetectedConcept[]
+    generate-viz/             POST concept → VizSpec
+    sample-pdfs/              GET available samples
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+components/
+  PdfViewer.tsx               pdf.js render + tag-pill overlay
+  UploadCard.tsx              landing dropzone + sample grid
+  Visualizer/
+    index.tsx                 type → renderer routing
+    ThreeDView.tsx            sandboxed Three.js executor
+    TwoDAnimView.tsx          sandboxed Canvas executor
+    FormulaView.tsx           KaTeX
+    GraphView.tsx             Canvas chart engine
+    TwoDTextView.tsx          Markdown + citations
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+lib/
+  codex.ts                    SDK wrapper, runJson<T>(prompt, schema)
+  schemas.ts                  per-type JSON Schemas + TS types
+  pdf-extract.ts              pdfjs-dist server-side parsing
+  viz-runtime.ts              IIFE-scoped sandbox for LLM-emitted JS
+  store.ts                    in-memory + /tmp doc storage
+```
+
+## Generating new sample PDFs
+
+`scripts/generate-sample-pdfs.ts` is a single-file pdfkit generator. Add a
+new entry to the `docs` array and run `npm run generate-pdfs`.
+
+## Smoke testing
+
+```bash
+npm run smoke         # one PDF, one tag click, screenshot
+npm run smoke-all     # all 5 PDFs, multiple tag types, screenshots → scripts/smoke-out/
+```
+
+Both rely on a running dev server at the URL in `BASE_URL` (default
+`http://localhost:3457`).
+
+## Notes & limits
+
+- The PDF must already have a text layer. We do not OCR.
+- Visualization code from the LLM runs client-side in a `new Function(...)`
+  body wrapped by an IIFE that shadows `THREE`, `ctx`, etc. We block the
+  obvious globals (`document`, `window`, `fetch`, `eval`, …) but this is a
+  demo sandbox, not a hard security boundary.
+- Generation latency: detection ~10–20s/page (low effort), code generation
+  ~30–60s for 3D / 2D-anim, ~10–15s for formula / graph / text. Plan
+  accordingly when picking PDFs.
