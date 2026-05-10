@@ -8,24 +8,37 @@ import {
   ArrowRight,
   Box,
   Activity,
+  Atom,
   FileText,
+  FlaskConical,
+  HeartPulse,
+  Scale,
   Sigma,
   BarChart3,
+  SquareFunction,
 } from "lucide-react";
-
-const SAMPLE_EMOJI: Record<string, string> = {
-  anatomy: "🫀",
-  physics: "⚙️",
-  costituzione: "⚖️",
-  calculus: "📐",
-  chemistry: "🧪",
-};
 
 type FeatureColor = "rose" | "amber" | "emerald" | "violet" | "sky";
 type FeatureIcon = React.ComponentType<{
   className?: string;
   style?: React.CSSProperties;
+  "aria-hidden"?: boolean;
 }>;
+type SampleIcon = {
+  Icon: FeatureIcon;
+  tone: FeatureColor;
+  label: string;
+};
+
+const SAMPLE_ICONS: Record<string, SampleIcon> = {
+  anatomy: { Icon: HeartPulse, tone: "rose", label: "Anatomy" },
+  physics: { Icon: Atom, tone: "amber", label: "Physics" },
+  costituzione: { Icon: Scale, tone: "emerald", label: "Constitution" },
+  calculus: { Icon: SquareFunction, tone: "violet", label: "Calculus" },
+  chemistry: { Icon: FlaskConical, tone: "sky", label: "Chemistry" },
+};
+const DEFAULT_SAMPLE_ICON: SampleIcon = { Icon: FileText, tone: "emerald", label: "Document" };
+
 const FEATURES: Array<{
   color: FeatureColor;
   icon: FeatureIcon;
@@ -195,32 +208,43 @@ export default function UploadCard() {
           Sample documents
         </p>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {samples.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => startSample(s.id)}
-              disabled={busy != null}
-              className="group flex items-start gap-4 rounded-xl border border-[var(--border-subtle)] bg-white p-4 text-left transition hover:border-[var(--border-strong)] disabled:opacity-50"
-            >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-sunken)] text-[18px] leading-none">
-                <span aria-hidden>{SAMPLE_EMOJI[s.id] ?? "📄"}</span>
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[14px] font-semibold text-[var(--ink-900)]">{s.title}</p>
-                <p className="mt-0.5 line-clamp-2 text-[12.5px] leading-relaxed text-[var(--ink-500)]">
-                  {s.description}
-                </p>
-                <div className="mt-2 text-[11px] tabular-nums text-[var(--ink-400)]">{s.sizeKb} KB</div>
-              </div>
-              <div className="self-center text-[var(--ink-400)] transition group-hover:translate-x-0.5 group-hover:text-[var(--ink-900)]">
-                {busy === s.id ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-[var(--accent-600)]" />
-                ) : (
-                  <ArrowRight className="h-4 w-4" />
-                )}
-              </div>
-            </button>
-          ))}
+          {samples.map((s) => {
+            const sampleIcon = SAMPLE_ICONS[s.id] ?? DEFAULT_SAMPLE_ICON;
+            const SampleIcon = sampleIcon.Icon;
+
+            return (
+              <button
+                key={s.id}
+                onClick={() => startSample(s.id)}
+                disabled={busy != null}
+                className="group flex items-start gap-4 rounded-xl border border-[var(--border-subtle)] bg-white p-4 text-left transition hover:border-[var(--border-strong)] disabled:opacity-50"
+              >
+                <div
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-sunken)]"
+                  style={{
+                    color: `var(--tag-${sampleIcon.tone}-fg)`,
+                  }}
+                  title={sampleIcon.label}
+                >
+                  <SampleIcon className="h-5 w-5" aria-hidden />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[14px] font-semibold text-[var(--ink-900)]">{s.title}</p>
+                  <p className="mt-0.5 line-clamp-2 text-[12.5px] leading-relaxed text-[var(--ink-500)]">
+                    {s.description}
+                  </p>
+                  <div className="mt-2 text-[11px] tabular-nums text-[var(--ink-400)]">{s.sizeKb} KB</div>
+                </div>
+                <div className="self-center text-[var(--ink-400)] transition group-hover:translate-x-0.5 group-hover:text-[var(--ink-900)]">
+                  {busy === s.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-[var(--accent-600)]" />
+                  ) : (
+                    <ArrowRight className="h-4 w-4" />
+                  )}
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
