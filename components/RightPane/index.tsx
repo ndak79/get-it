@@ -18,11 +18,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  Box,
-  Activity,
   Sigma,
-  BarChart3,
-  FileText,
   MessageSquare,
   Layers,
   Network,
@@ -32,12 +28,18 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-import type { VizSpec, VizType } from "@/lib/schemas";
+import type { VizSpec } from "@/lib/schemas";
 import ThreeDView from "@/components/Visualizer/ThreeDView";
 import TwoDAnimView from "@/components/Visualizer/TwoDAnimView";
 import TwoDTextView from "@/components/Visualizer/TwoDTextView";
 import FormulaView from "@/components/Visualizer/FormulaView";
 import GraphView from "@/components/Visualizer/GraphView";
+import VizLegendIcon from "@/components/Visualizer/VizLegendIcon";
+import {
+  VIZ_LEGEND_ORDER,
+  VIZ_TYPE_META,
+  vizTypeStyle,
+} from "@/components/Visualizer/viz-meta";
 
 import KnowledgeGraphView from "./KnowledgeGraphView";
 import ChatView from "./ChatView";
@@ -83,22 +85,6 @@ const MODES: Array<{
     description: "Teach the topic to a curious child",
   },
 ];
-
-const VIZ_TYPE_LABEL: Record<VizType, string> = {
-  "3d": "3D Model",
-  "2d-anim": "Animation",
-  "2d-text": "Source",
-  formula: "Formula",
-  graph: "Graph",
-};
-
-const VIZ_TYPE_ICON: Record<VizType, React.ComponentType<{ className?: string }>> = {
-  "3d": Box,
-  "2d-anim": Activity,
-  "2d-text": FileText,
-  formula: Sigma,
-  graph: BarChart3,
-};
 
 type Props = {
   docId: string;
@@ -280,12 +266,12 @@ function Header({
 
         {/* Visualizer-mode shows the viz-type chip + title; other modes show the mode description */}
         {mode === "visualizer" && visualizerSpec && (
-          <span className="chip-soft">
+          <span className="viz-type-chip" style={vizTypeStyle(visualizerSpec.type)}>
             {(() => {
-              const Icon = VIZ_TYPE_ICON[visualizerSpec.type];
-              return <Icon className="h-3 w-3" />;
+              const Icon = VIZ_TYPE_META[visualizerSpec.type].Icon;
+              return <Icon className="h-3 w-3" aria-hidden />;
             })()}
-            {VIZ_TYPE_LABEL[visualizerSpec.type]}
+            {VIZ_TYPE_META[visualizerSpec.type].label}
           </span>
         )}
         <p className="truncate text-[13.5px] font-medium text-[var(--ink-900)]">{subtitle}</p>
@@ -344,17 +330,9 @@ function VisualizerBody({
         >
           <div className="max-w-sm">
             <div className="mb-4 flex justify-center gap-2.5">
-              {(["3d", "2d-anim", "formula", "graph", "2d-text"] as VizType[]).map((t) => {
-                const Icon = VIZ_TYPE_ICON[t];
-                return (
-                  <div
-                    key={t}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-white"
-                  >
-                    <Icon className="h-4 w-4 text-[var(--ink-500)]" />
-                  </div>
-                );
-              })}
+              {VIZ_LEGEND_ORDER.map((type) => (
+                <VizLegendIcon key={type} type={type} />
+              ))}
             </div>
             <p className="text-[13.5px] leading-relaxed text-[var(--ink-500)]">
               {emptyHint ?? "Click any tag in the document to render its concept here."}

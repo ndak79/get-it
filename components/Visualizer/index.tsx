@@ -1,29 +1,15 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { Box, Activity, FileText, Sigma, BarChart3, MoreHorizontal } from "lucide-react";
-import type { VizSpec, VizType } from "@/lib/schemas";
+import { Sigma, MoreHorizontal } from "lucide-react";
+import type { VizSpec } from "@/lib/schemas";
 import ThreeDView from "./ThreeDView";
 import TwoDAnimView from "./TwoDAnimView";
 import TwoDTextView from "./TwoDTextView";
 import FormulaView from "./FormulaView";
 import GraphView from "./GraphView";
-
-const TYPE_LABEL: Record<VizType, string> = {
-  "3d": "3D Model",
-  "2d-anim": "Animation",
-  "2d-text": "Source",
-  formula: "Formula",
-  graph: "Graph",
-};
-
-const TYPE_ICON: Record<VizType, React.ComponentType<{ className?: string }>> = {
-  "3d": Box,
-  "2d-anim": Activity,
-  "2d-text": FileText,
-  formula: Sigma,
-  graph: BarChart3,
-};
+import VizLegendIcon from "./VizLegendIcon";
+import { VIZ_LEGEND_ORDER, VIZ_TYPE_META, vizTypeStyle } from "./viz-meta";
 
 type Props = {
   spec: VizSpec | null;
@@ -44,12 +30,12 @@ export default function Visualizer({ spec, loading, emptyHint, loadingDetail, on
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-white px-5 py-2">
         <div className="flex min-w-0 items-center gap-2.5">
           {spec ? (
-            <span className="chip-soft">
+            <span className="viz-type-chip" style={vizTypeStyle(spec.type)}>
               {(() => {
-                const Icon = TYPE_ICON[spec.type];
-                return <Icon className="h-3 w-3" />;
+                const Icon = VIZ_TYPE_META[spec.type].Icon;
+                return <Icon className="h-3 w-3" aria-hidden />;
               })()}
-              {TYPE_LABEL[spec.type]}
+              {VIZ_TYPE_META[spec.type].label}
             </span>
           ) : (
             <span className="chip-plain">
@@ -100,17 +86,9 @@ export default function Visualizer({ spec, loading, emptyHint, loadingDetail, on
             >
               <div className="max-w-sm">
                 <div className="mb-4 flex justify-center gap-2.5">
-                  {(["3d", "2d-anim", "formula", "graph", "2d-text"] as VizType[]).map((t) => {
-                    const Icon = TYPE_ICON[t];
-                    return (
-                      <div
-                        key={t}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-white"
-                      >
-                        <Icon className="h-4 w-4 text-[var(--ink-500)]" />
-                      </div>
-                    );
-                  })}
+                  {VIZ_LEGEND_ORDER.map((type) => (
+                    <VizLegendIcon key={type} type={type} />
+                  ))}
                 </div>
                 <p className="text-[13.5px] leading-relaxed text-[var(--ink-500)]">
                   {emptyHint ?? "Click any tag in the document to render its concept here."}

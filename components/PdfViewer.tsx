@@ -3,11 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  Box,
-  Activity,
-  FileText,
-  Sigma,
-  BarChart3,
   Loader2,
   Plus,
   Minus,
@@ -15,6 +10,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import type { VizType } from "@/lib/schemas";
+import { VIZ_TYPE_META, vizTypeStyle } from "@/components/Visualizer/viz-meta";
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist/legacy/build/pdf.mjs";
 import type { PDFDocumentProxy } from "pdfjs-dist/types/src/display/api";
 
@@ -22,22 +18,7 @@ if (typeof window !== "undefined") {
   GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 }
 
-const TYPE_ICON: Record<VizType, React.ComponentType<{ className?: string }>> = {
-  "3d": Box,
-  "2d-anim": Activity,
-  "2d-text": FileText,
-  formula: Sigma,
-  graph: BarChart3,
-};
-
-// CSS-variable token sets for each tag type (resolved in globals.css).
-const TYPE_VARS: Record<VizType, { bg: string; fg: string; ring: string }> = {
-  "3d":      { bg: "var(--tag-rose-bg)",    fg: "var(--tag-rose-fg)",    ring: "var(--tag-rose-ring)" },
-  "2d-anim": { bg: "var(--tag-amber-bg)",   fg: "var(--tag-amber-fg)",   ring: "var(--tag-amber-ring)" },
-  "2d-text": { bg: "var(--tag-emerald-bg)", fg: "var(--tag-emerald-fg)", ring: "var(--tag-emerald-ring)" },
-  formula:   { bg: "var(--tag-violet-bg)",  fg: "var(--tag-violet-fg)",  ring: "var(--tag-violet-ring)" },
-  graph:     { bg: "var(--tag-sky-bg)",     fg: "var(--tag-sky-fg)",     ring: "var(--tag-sky-ring)" },
-};
+const TAG_LABEL_VISIBLE_CHARS = 8;
 
 export type Tag = {
   id: string;
@@ -62,6 +43,11 @@ type Props = {
   onTagClick: (tagId: string) => void;
   detecting?: boolean;
 };
+
+function truncateTagLabel(label: string): string {
+  if (label.length <= TAG_LABEL_VISIBLE_CHARS) return label;
+  return `${label.slice(0, TAG_LABEL_VISIBLE_CHARS).trimEnd()}...`;
+}
 
 export default function PdfViewer({
   pdfUrl,
@@ -464,28 +450,22 @@ function TagPill({
   isActive: boolean;
   onClick: () => void;
 }) {
-  const Icon = TYPE_ICON[tag.type];
+  const { Icon, label: typeLabel } = VIZ_TYPE_META[tag.type];
 
   const top = (pdfHeight - tag.endY - tag.fontHeight * 0.85) * scale - 1;
   const left = tag.endX * scale + 4;
 
   const isIdle = !tag.ready && !tag.generating;
   const clickable = tag.ready || isIdle;
-  const tokens = TYPE_VARS[tag.type];
-  const colorTokens =
-    tag.ready || isIdle
-      ? ({
-          ["--bg" as string]: tokens.bg,
-          ["--fg" as string]: tokens.fg,
-          ["--ring" as string]: tokens.ring,
-        } as React.CSSProperties)
-      : {};
-  const title = tag.ready
-    ? tag.label
+  const labelWithType = `${typeLabel}: ${tag.label}`;
+  const tooltip = tag.ready
+    ? labelWithType
     : tag.generating
-      ? "preparing visualization…"
-      : `Click to generate visualization for "${tag.label}"`;
+      ? `${labelWithType} (preparing visualization...)`
+      : `${labelWithType} (click to generate)`;
+  const tooltipId = `pdf-tag-tooltip-${tag.id}`;
   const stateAttr = tag.ready ? "ready" : tag.generating ? "generating" : "idle";
+  const displayLabel = truncateTagLabel(tag.label);
 
   return (
     <motion.button
@@ -493,20 +473,32 @@ function TagPill({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.25 }}
       type="button"
-      disabled={!clickable}
-      onClick={onClick}
+      aria-label={tooltip}
+      aria-describedby={tooltipId}
+      aria-disabled={!clickable}
+      onClick={(event) => {
+        if (!clickable) {
+          event.preventDefault();
+          return;
+        }
+        onClick();
+      }}
       data-active={isActive ? "true" : "false"}
       data-state={stateAttr}
-      style={{ left, top, ...colorTokens }}
-      className="tag-pill pointer-events-auto absolute -translate-y-0.5"
-      title={title}
+      style={{ left, top, ...vizTypeStyle(tag.type) }}
+      className="tag-pill viz-tooltip-anchor pointer-events-auto absolute -translate-y-0.5"
     >
       {tag.generating ? (
-        <Loader2 className="h-2.5 w-2.5 animate-spin" />
+        <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
       ) : (
-        <Icon className="h-2.5 w-2.5" />
+        <Icon className="h-3 w-3" aria-hidden />
       )}
-      <span className="max-w-[160px] truncate">{tag.label}</span>
+      <span className="tag-pill-label" aria-hidden>
+        {displayLabel}
+      </span>
+      <span id={tooltipId} className="viz-tooltip" role="tooltip">
+        {tooltip}
+      </span>
     </motion.button>
   );
 }
