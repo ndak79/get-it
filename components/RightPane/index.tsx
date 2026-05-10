@@ -1,0 +1,384 @@
+"use client";
+
+/**
+ * Right-pane shell.
+ *
+ * Replaces the dedicated Visualizer pane with a multi-tool surface.
+ * The header carries a dropdown that switches between five tools:
+ *
+ *   - Visualizer       (the original concept-renderer; per-tag click)
+ *   - Knowledge Graph  (concept map + evaluation scores)
+ *   - Chat             (multi-turn, multi-thread Q&A)
+ *   - Flashcards       (active recall decks with self-grading)
+ *   - Feynman          (explain to a curious child, 4 turns)
+ *
+ * The Visualizer view is essentially the original component, lifted into
+ * here so the chrome (mode chip + title) lives in one place.
+ */
+
+import { useEffect, useRef, useState } from "react";
+import {
+  Box,
+  Activity,
+  Sigma,
+  BarChart3,
+  FileText,
+  MessageSquare,
+  Layers,
+  Network,
+  Baby,
+  ChevronDown,
+  MoreHorizontal,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+
+import type { VizSpec, VizType } from "@/lib/schemas";
+import ThreeDView from "@/components/Visualizer/ThreeDView";
+import TwoDAnimView from "@/components/Visualizer/TwoDAnimView";
+import TwoDTextView from "@/components/Visualizer/TwoDTextView";
+import FormulaView from "@/components/Visualizer/FormulaView";
+import GraphView from "@/components/Visualizer/GraphView";
+
+import KnowledgeGraphView from "./KnowledgeGraphView";
+import ChatView from "./ChatView";
+import FlashcardsView from "./FlashcardsView";
+import FeynmanView from "./FeynmanView";
+
+export type RightPaneMode = "visualizer" | "graph" | "chat" | "flashcards" | "feynman";
+
+const MODES: Array<{
+  id: RightPaneMode;
+  label: string;
+  Icon: React.ComponentType<{ className?: string }>;
+  description: string;
+}> = [
+  {
+    id: "visualizer",
+    label: "Visualizer",
+    Icon: Sigma,
+    description: "Render the active tag as 3D / animation / formula / graph / source",
+  },
+  {
+    id: "graph",
+    label: "Knowledge Graph",
+    Icon: Network,
+    description: "Map of concepts with live mastery scores",
+  },
+  {
+    id: "chat",
+    label: "Chat",
+    Icon: MessageSquare,
+    description: "Multi-turn Q&A about the document",
+  },
+  {
+    id: "flashcards",
+    label: "Flashcards",
+    Icon: Layers,
+    description: "Active-recall decks with self-grading",
+  },
+  {
+    id: "feynman",
+    label: "Feynman",
+    Icon: Baby,
+    description: "Teach the topic to a curious child",
+  },
+];
+
+const VIZ_TYPE_LABEL: Record<VizType, string> = {
+  "3d": "3D Model",
+  "2d-anim": "Animation",
+  "2d-text": "Source",
+  formula: "Formula",
+  graph: "Graph",
+};
+
+const VIZ_TYPE_ICON: Record<VizType, React.ComponentType<{ className?: string }>> = {
+  "3d": Box,
+  "2d-anim": Activity,
+  "2d-text": FileText,
+  formula: Sigma,
+  graph: BarChart3,
+};
+
+type Props = {
+  docId: string;
+  mode: RightPaneMode;
+  onModeChange: (m: RightPaneMode) => void;
+  // Visualizer-only props (forwarded as-is from the orchestrator)
+  visualizer: {
+    spec: VizSpec | null;
+    loading: boolean;
+    emptyHint?: string;
+    loadingDetail?: string;
+    onRuntimeError?: (msg: string) => void;
+    activeTagError?: string | null;
+  };
+};
+
+export default function RightPane({ docId, mode, onModeChange, visualizer }: Props) {
+  return (
+    <div className="flex h-full flex-col bg-white">
+      <Header mode={mode} onModeChange={onModeChange} visualizerSpec={visualizer.spec} />
+
+      <div className="relative min-h-0 flex-1 bg-white">
+        {mode === "visualizer" && (
+          <VisualizerBody
+            spec={visualizer.spec}
+            loading={visualizer.loading}
+            emptyHint={visualizer.emptyHint}
+            loadingDetail={visualizer.loadingDetail}
+            onRuntimeError={visualizer.onRuntimeError}
+          />
+        )}
+        {mode === "graph" && (
+          <KnowledgeGraphView
+            docId={docId}
+            onJumpToTool={(tool, topic) => {
+              onModeChange(tool === "chat" ? "chat" : tool === "flashcards" ? "flashcards" : "feynman");
+              // Pre-fill is handled inside each tool via sessionStorage hint.
+              try {
+                window.sessionStorage.setItem(
+                  `braynr:${docId}:tool-prefill`,
+                  JSON.stringify({ tool, topic, ts: Date.now() }),
+                );
+              } catch {
+                /* noop */
+              }
+            }}
+          />
+        )}
+        {mode === "chat" && <ChatView docId={docId} />}
+        {mode === "flashcards" && <FlashcardsView docId={docId} />}
+        {mode === "feynman" && <FeynmanView docId={docId} />}
+      </div>
+
+      {mode === "visualizer" && visualizer.spec && (
+        <footer className="shrink-0 border-t border-[var(--border-subtle)] bg-white px-5 py-3">
+          <p className="text-[12.5px] leading-relaxed text-[var(--ink-700)]">
+            {visualizer.spec.caption}
+          </p>
+        </footer>
+      )}
+      {mode === "visualizer" && visualizer.activeTagError && (
+        <div className="shrink-0 border-t border-amber-200 bg-amber-50 px-5 py-3 text-[12px] text-amber-800">
+          {visualizer.activeTagError}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Header (mode dropdown + active title) ─────────────────────────────
+
+function Header({
+  mode,
+  onModeChange,
+  visualizerSpec,
+}: {
+  mode: RightPaneMode;
+  onModeChange: (m: RightPaneMode) => void;
+  visualizerSpec: VizSpec | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("mousedown", onClick);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onClick);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const current = MODES.find((m) => m.id === mode)!;
+  const CurrentIcon = current.Icon;
+
+  // Subtitle: viz title when visualizer mode + spec, else mode description.
+  const subtitle =
+    mode === "visualizer" && visualizerSpec
+      ? visualizerSpec.title
+      : mode === "visualizer"
+        ? "Pick a tag to begin"
+        : current.description;
+
+  return (
+    <header className="relative flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-white px-5 py-2">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <div ref={ref} className="relative">
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[12px] font-medium transition-colors ${
+              open
+                ? "border-[var(--accent-100)] bg-[var(--accent-50)] text-[var(--accent-700)]"
+                : "border-[var(--border-subtle)] bg-white text-[var(--ink-900)] hover:bg-[var(--surface-sunken)]"
+            }`}
+          >
+            <CurrentIcon className="h-3 w-3" />
+            {current.label}
+            <ChevronDown className="h-3 w-3 opacity-60" />
+          </button>
+          <AnimatePresence>
+            {open && (
+              <motion.div
+                key="menu"
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.12 }}
+                className="absolute left-0 top-full z-20 mt-1.5 w-72 overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-white shadow-[0_8px_24px_rgba(17,17,19,0.08)]"
+              >
+                {MODES.map((m) => {
+                  const Icon = m.Icon;
+                  const active = m.id === mode;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        onModeChange(m.id);
+                        setOpen(false);
+                      }}
+                      className={`flex w-full items-start gap-2.5 px-3 py-2 text-left transition-colors ${
+                        active
+                          ? "bg-[var(--accent-50)]"
+                          : "hover:bg-[var(--surface-sunken)]"
+                      }`}
+                    >
+                      <Icon
+                        className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${
+                          active ? "text-[var(--accent-700)]" : "text-[var(--ink-500)]"
+                        }`}
+                      />
+                      <div className="min-w-0">
+                        <p
+                          className={`text-[12.5px] font-medium ${
+                            active ? "text-[var(--accent-700)]" : "text-[var(--ink-900)]"
+                          }`}
+                        >
+                          {m.label}
+                        </p>
+                        <p className="text-[11px] leading-relaxed text-[var(--ink-500)]">
+                          {m.description}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Visualizer-mode shows the viz-type chip + title; other modes show the mode description */}
+        {mode === "visualizer" && visualizerSpec && (
+          <span className="chip-soft">
+            {(() => {
+              const Icon = VIZ_TYPE_ICON[visualizerSpec.type];
+              return <Icon className="h-3 w-3" />;
+            })()}
+            {VIZ_TYPE_LABEL[visualizerSpec.type]}
+          </span>
+        )}
+        <p className="truncate text-[13.5px] font-medium text-[var(--ink-900)]">{subtitle}</p>
+      </div>
+      <button type="button" className="tab-icon-btn">
+        <MoreHorizontal className="h-4 w-4" />
+      </button>
+    </header>
+  );
+}
+
+// ── Visualizer body (extracted from the original Visualizer component) ─
+
+function VisualizerBody({
+  spec,
+  loading,
+  emptyHint,
+  loadingDetail,
+  onRuntimeError,
+}: {
+  spec: VizSpec | null;
+  loading: boolean;
+  emptyHint?: string;
+  loadingDetail?: string;
+  onRuntimeError?: (msg: string) => void;
+}) {
+  return (
+    <AnimatePresence mode="wait">
+      {loading && !spec && (
+        <motion.div
+          key="loading"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 flex items-center justify-center"
+        >
+          <div className="flex flex-col items-center gap-3 text-[var(--ink-500)]">
+            <div className="flex gap-1">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--ink-400)] [animation-delay:0ms]" />
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--ink-400)] [animation-delay:150ms]" />
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--ink-400)] [animation-delay:300ms]" />
+            </div>
+            <p className="text-xs">codex is composing the visualization</p>
+            {loadingDetail && <p className="text-[11px] text-[var(--ink-400)]">{loadingDetail}</p>}
+          </div>
+        </motion.div>
+      )}
+
+      {!spec && !loading && (
+        <motion.div
+          key="empty"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 flex items-center justify-center px-8 text-center"
+        >
+          <div className="max-w-sm">
+            <div className="mb-4 flex justify-center gap-2.5">
+              {(["3d", "2d-anim", "formula", "graph", "2d-text"] as VizType[]).map((t) => {
+                const Icon = VIZ_TYPE_ICON[t];
+                return (
+                  <div
+                    key={t}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-white"
+                  >
+                    <Icon className="h-4 w-4 text-[var(--ink-500)]" />
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-[13.5px] leading-relaxed text-[var(--ink-500)]">
+              {emptyHint ?? "Click any tag in the document to render its concept here."}
+            </p>
+          </div>
+        </motion.div>
+      )}
+
+      {spec && (
+        <motion.div
+          key={spec.title}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className="absolute inset-0"
+        >
+          {spec.type === "3d" && <ThreeDView spec={spec} onRuntimeError={onRuntimeError} />}
+          {spec.type === "2d-anim" && <TwoDAnimView spec={spec} onRuntimeError={onRuntimeError} />}
+          {spec.type === "2d-text" && <TwoDTextView spec={spec} />}
+          {spec.type === "formula" && <FormulaView spec={spec} />}
+          {spec.type === "graph" && <GraphView spec={spec} onRuntimeError={onRuntimeError} />}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}

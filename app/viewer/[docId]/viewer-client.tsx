@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 
 import PdfViewer, { type Tag } from "@/components/PdfViewer";
-import Visualizer from "@/components/Visualizer";
+import RightPane, { type RightPaneMode } from "@/components/RightPane";
 import type { DetectedConcept, VizSpec, VizType } from "@/lib/schemas";
 import { AUTO_GENERATE_VIZ, MAX_VIZ_GEN_RETRIES } from "@/lib/config";
 import {
@@ -92,6 +92,37 @@ export default function ViewerClient({ docId }: { docId: string }) {
     () => new Set(persistedOnMount?.pagesAnalyzed ?? []),
   );
   const restoredFromCache = persistedOnMount !== null;
+
+  // Right-pane mode (Visualizer / KG / Chat / Flashcards / Feynman). The
+  // mode is tab-scoped — we re-load it from sessionStorage so it survives
+  // refreshes within the session.
+  const [rightPaneMode, setRightPaneMode] = useState<RightPaneMode>(() => {
+    if (typeof window === "undefined") return "visualizer";
+    const v = window.sessionStorage.getItem(`braynr:${docId}:right-mode`);
+    if (v === "visualizer" || v === "graph" || v === "chat" || v === "flashcards" || v === "feynman")
+      return v;
+    return "visualizer";
+  });
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(`braynr:${docId}:right-mode`, rightPaneMode);
+    } catch {
+      /* noop */
+    }
+  }, [docId, rightPaneMode]);
+
+  // Kick off knowledge-graph build once we know the doc is loaded. The
+  // build route is idempotent server-side — if a graph already exists on
+  // disk, the call is a no-op. We don't await: the KG view polls /state
+  // and shows its own "building…" placeholder.
+  const kgBuildKickedRef = useRef(false);
+  useEffect(() => {
+    if (!meta || kgBuildKickedRef.current) return;
+    kgBuildKickedRef.current = true;
+    fetch(`/api/kg/${docId}/build`, { method: "POST" }).catch((e) => {
+      console.warn("[braynr] kg/build kick failed", e);
+    });
+  }, [meta, docId]);
 
   // ── Load document metadata from server ───────────────────────────────
   useEffect(() => {
@@ -584,40 +615,35 @@ export default function ViewerClient({ docId }: { docId: string }) {
           />
         </div>
         <div className="flex w-[44%] min-w-[420px] max-w-[720px] flex-col overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-white">
-          <div className="min-h-0 flex-1">
-            <Visualizer
+          <RightPane
+            docId={docId}
+            mode={rightPaneMode}
+            onModeChange={setRightPaneMode}
+            visualizer={{
               // While retrying OR after final failure, hide the broken
               // spec so the loader / empty state shows. The spec is kept
               // on the tag itself only as repair context.
-              spec={activeTag?.generating || activeTag?.error ? null : activeSpec}
-              loading={
+              spec: activeTag?.generating || activeTag?.error ? null : activeSpec,
+              loading:
                 activeTag != null && !activeTag.error &&
-                (activeTag.generating || !activeTag.spec)
-              }
-              loadingDetail={
+                (activeTag.generating || !activeTag.spec),
+              loadingDetail:
                 activeTag?.generating && (activeTag.attempts ?? 0) >= 1
                   ? `repairing — attempt ${(activeTag.attempts ?? 0) + 1} of ${MAX_VIZ_GEN_RETRIES + 1}`
-                  : undefined
-              }
-              onRuntimeError={
-                activeTag ? (msg) => handleRuntimeError(activeTag.id, msg) : undefined
-              }
-              emptyHint={
-                activeTag?.error
-                  ? "We weren't able to build a working visualization for this concept. Pick another tag — most of them work cleanly."
-                  : tags.length === 0
-                    ? "codex is reading the document — tags will appear inline as soon as they're detected."
-                    : AUTO_GENERATE_VIZ
-                      ? "Click any colored tag in the document to render its concept here."
-                      : "Click any tag to generate its visualization. (manual mode is on — see .env)"
-              }
-            />
-          </div>
-          {activeTag?.error && (
-            <div className="shrink-0 border-t border-amber-200 bg-amber-50 px-5 py-3 text-[12px] text-amber-800">
-              {activeTag.error}
-            </div>
-          )}
+                  : undefined,
+              onRuntimeError: activeTag
+                ? (msg) => handleRuntimeError(activeTag.id, msg)
+                : undefined,
+              emptyHint: activeTag?.error
+                ? "We weren't able to build a working visualization for this concept. Pick another tag — most of them work cleanly."
+                : tags.length === 0
+                  ? "codex is reading the document — tags will appear inline as soon as they're detected."
+                  : AUTO_GENERATE_VIZ
+                    ? "Click any colored tag in the document to render its concept here."
+                    : "Click any tag to generate its visualization. (manual mode is on — see .env)",
+              activeTagError: activeTag?.error ?? null,
+            }}
+          />
         </div>
       </div>
     </div>
