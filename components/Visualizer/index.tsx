@@ -34,7 +34,7 @@ type Props = {
 export default function Visualizer({ spec, loading, emptyHint }: Props) {
   return (
     <div className="flex h-full flex-col bg-white">
-      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-white px-5 py-3">
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-white px-5 py-2">
         <div className="flex min-w-0 items-center gap-2.5">
           {spec ? (
             <span className="chip-soft">

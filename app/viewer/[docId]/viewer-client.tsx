@@ -8,12 +8,8 @@ import {
   RefreshCw,
   AlertCircle,
   MousePointerClick,
-  ChevronDown,
-  Plus,
-  Settings2,
   BookOpen,
-  Users,
-  Calendar,
+  Settings2,
   RotateCcw,
 } from "lucide-react";
 
@@ -467,17 +463,6 @@ export default function ViewerClient({ docId }: { docId: string }) {
           <BookOpen className="h-3.5 w-3.5 text-[var(--ink-400)]" />
           <span>Library</span>
         </div>
-        <div className="tab-item">
-          <Users className="h-3.5 w-3.5 text-[var(--ink-400)]" />
-          <span>Concepts</span>
-        </div>
-        <div className="tab-item">
-          <Calendar className="h-3.5 w-3.5 text-[var(--ink-400)]" />
-          <span>Recent</span>
-        </div>
-        <div className="tab-icon-btn ml-1">
-          <Plus className="h-3.5 w-3.5" />
-        </div>
         <div className="ml-auto flex items-center gap-2 pr-1">
           <ProgressChip
             label="pages"
@@ -499,9 +484,6 @@ export default function ViewerClient({ docId }: { docId: string }) {
           >
             <RotateCcw className="h-3.5 w-3.5" />
           </button>
-          <div className="tab-icon-btn">
-            <ChevronDown className="h-3.5 w-3.5" />
-          </div>
           <div className="tab-icon-btn">
             <Settings2 className="h-3.5 w-3.5" />
           </div>

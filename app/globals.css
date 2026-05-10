@@ -8,7 +8,7 @@
 
 :root {
   /* Surfaces */
-  --surface-canvas: #f6f5f2;       /* outer chrome (top bar strip) */
+  --surface-canvas: #ece6d6;       /* outer chrome — clearly cream against white */
   --surface-raised: #ffffff;       /* main content + cards */
   --surface-sunken: #f3f2ef;       /* hovers, gentle wells */
   --surface-overlay: rgba(255, 255, 255, 0.85);
@@ -108,9 +108,25 @@ body {
 .tab-item[data-active="true"] {
   background: var(--surface-raised);
   color: var(--ink-900);
-  border-color: var(--border-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  margin-bottom: 4px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  box-shadow: 0 1px 0 rgba(17, 17, 19, 0.02);
+}
+/* "Fused" variant — landing page: classic browser-tab look. The bar keeps
+   its canvas color so the active tab pops as a white card whose bottom
+   edge merges into the white content sheet below. */
+.tab-bar--fused .tab-item[data-active="true"] {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-bottom-color: var(--surface-raised);
+  border-radius: 8px 8px 0 0;
   margin-bottom: -1px;
+  padding-top: 7px;
   padding-bottom: 8px;
+  box-shadow: none;
 }
 .tab-icon-btn {
   display: inline-flex;
@@ -129,10 +145,11 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 10px;
-  border-radius: 7px;
-  font-size: 12.5px;
+  padding: 2px 9px;
+  border-radius: 6px;
+  font-size: 12px;
   font-weight: 500;
+  line-height: 1.4;
   color: var(--accent-700);
   background: var(--accent-50);
   border: 1px solid var(--accent-100);
@@ -141,10 +158,11 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 10px;
-  border-radius: 7px;
-  font-size: 12.5px;
+  padding: 2px 9px;
+  border-radius: 6px;
+  font-size: 12px;
   font-weight: 500;
+  line-height: 1.4;
   color: var(--ink-500);
 }
 .chip-plain:hover { color: var(--ink-900); background: rgba(17, 17, 19, 0.04); }

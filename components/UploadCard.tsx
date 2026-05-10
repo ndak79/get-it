@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, FileUp, Loader2, ArrowRight, Tag as TagIcon, ChevronDown } from "lucide-react";
+import { Upload, FileUp, Loader2, ArrowRight } from "lucide-react";
 
 type Sample = {
   id: string;
@@ -71,33 +71,13 @@ export default function UploadCard() {
 
   return (
     <div className="mx-auto w-full max-w-4xl px-10 py-14">
-      {/* Header row — chips above the title, just like the mockup */}
-      <div className="mb-5 flex items-center gap-2">
-        <button type="button" className="chip-soft">
-          <FileUp className="h-3 w-3" />
-          Note
-          <ChevronDown className="h-3 w-3 opacity-60" />
-        </button>
-        <button type="button" className="chip-plain">
-          <FileUp className="h-3 w-3" />
-          Collections
-        </button>
-      </div>
-
       <h1 className="text-balance text-[44px] font-bold leading-[1.08] tracking-tight text-[var(--ink-900)]">
-        Read with a brain on your shoulder.
+        Read it. See it. Get it.
       </h1>
 
-      <div className="mt-3 flex items-center gap-2 text-[13px] text-[var(--ink-400)]">
-        <TagIcon className="h-3.5 w-3.5" />
-        <span>Tags</span>
-      </div>
-
       <p className="mt-7 max-w-2xl text-[15px] leading-[1.65] text-[var(--ink-700)]">
-        Drop in any well-tagged PDF. Braynr&apos;s agent reads it, picks the
-        concepts that benefit from a picture, and renders them — 3D models,
-        animated simulations, formulas, graphs, or live source citations —
-        right next to the text.
+        Upload any PDF. Our agent finds what&apos;s worth visualizing and
+        renders it inline — 3D, simulations, formulas, graphs.
       </p>
 
       {/* Drop zone */}
