@@ -9,7 +9,8 @@
     "lint": "eslint",
     "generate-pdfs": "tsx scripts/generate-sample-pdfs.ts",
     "smoke": "node scripts/smoke-test.mjs",
-    "smoke-all": "node scripts/full-test.mjs"
+    "smoke-all": "node scripts/full-test.mjs",
+    "build-writeup": "node scripts/build-pdf.mjs"
   },
   "dependencies": {
     "@openai/codex-sdk": "^0.130.0",
@@ -38,6 +39,7 @@
     "@types/three": "^0.184.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "marked": "^14.1.4",
     "playwright": "^1.59.1",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
