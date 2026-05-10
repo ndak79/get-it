@@ -3,7 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { GraphSpec } from "@/lib/schemas";
 
-type Props = { spec: GraphSpec };
+type Props = {
+  spec: GraphSpec;
+  /** Called once per spec instance if the chart fails to render. */
+  onRuntimeError?: (message: string) => void;
+};
 
 const COLORS = ["#5b66f1", "#d97706", "#db2777", "#7c3aed", "#059669", "#dc2626"];
 
@@ -13,13 +17,22 @@ function safeFn(expr: string): (x: number) => number {
   return (x: number) => fn(Math, x);
 }
 
-export default function GraphView({ spec }: Props) {
+export default function GraphView({ spec, onRuntimeError }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const reportedRef = useRef(false);
 
   useEffect(() => {
     setError(null);
+    reportedRef.current = false;
+    const reportError = (msg: string) => {
+      setError(msg);
+      if (!reportedRef.current) {
+        reportedRef.current = true;
+        onRuntimeError?.(msg);
+      }
+    };
     const c = canvasRef.current;
     const cont = containerRef.current;
     if (!c || !cont) return;
@@ -232,9 +245,12 @@ export default function GraphView({ spec }: Props) {
       ctx.fillText(spec.y_label || "y", 0, 0);
       ctx.restore();
     } catch (e) {
-      console.error("graph render error", e);
-      setError(`Graph render failed: ${(e as Error).message}`);
+      console.warn("graph render threw (will be reported for repair):", e);
+      reportError(`Graph render failed: ${(e as Error).message}`);
     }
+    // onRuntimeError captured by closure; we don't re-render the chart on
+    // every parent rerender that produces a new function reference.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spec]);
 
   return (

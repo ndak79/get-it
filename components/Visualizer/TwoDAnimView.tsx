@@ -4,15 +4,28 @@ import { useEffect, useRef, useState } from "react";
 import { compileFn } from "@/lib/viz-runtime";
 import type { TwoDAnimSpec } from "@/lib/schemas";
 
-type Props = { spec: TwoDAnimSpec };
+type Props = {
+  spec: TwoDAnimSpec;
+  /** Called once per spec instance if setup or any draw frame throws. */
+  onRuntimeError?: (message: string) => void;
+};
 
-export default function TwoDAnimView({ spec }: Props) {
+export default function TwoDAnimView({ spec, onRuntimeError }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const reportedRef = useRef(false);
 
   useEffect(() => {
     setError(null);
+    reportedRef.current = false;
+    const reportError = (msg: string) => {
+      setError(msg);
+      if (!reportedRef.current) {
+        reportedRef.current = true;
+        onRuntimeError?.(msg);
+      }
+    };
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
@@ -49,8 +62,10 @@ export default function TwoDAnimView({ spec }: Props) {
         | undefined;
       if (ret && typeof ret.draw === "function") drawCb = ret.draw;
     } catch (e) {
-      console.error("2D anim setup error", e);
-      setError(`Animation crashed at setup: ${(e as Error).message}`);
+      // warn (not error) — Next.js dev overlay treats console.error as
+      // an "Issue". The orchestrator handles retries.
+      console.warn("2D anim setup threw (will be reported for repair):", e);
+      reportError(`Animation crashed at setup: ${(e as Error).message}`);
     }
 
     const t0 = performance.now();
@@ -61,8 +76,8 @@ export default function TwoDAnimView({ spec }: Props) {
       try {
         drawCb?.(ctx, container.clientWidth, container.clientHeight, t, dt);
       } catch (e) {
-        console.error("2D anim draw error", e);
-        setError(`Animation crashed: ${(e as Error).message}`);
+        console.warn("2D anim draw threw (will be reported for repair):", e);
+        reportError(`Animation crashed mid-frame: ${(e as Error).message}`);
         return;
       }
       raf = requestAnimationFrame(tick);
@@ -76,6 +91,9 @@ export default function TwoDAnimView({ spec }: Props) {
       cancelAnimationFrame(raf);
       ro.disconnect();
     };
+    // onRuntimeError captured by closure; we don't want to remount on every
+    // parent re-render that produces a new function reference.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spec]);
 
   return (

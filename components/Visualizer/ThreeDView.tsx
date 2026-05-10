@@ -5,14 +5,27 @@ import * as THREE from "three";
 import { compileFn } from "@/lib/viz-runtime";
 import type { ThreeDSpec } from "@/lib/schemas";
 
-type Props = { spec: ThreeDSpec };
+type Props = {
+  spec: ThreeDSpec;
+  /** Called once per spec instance if the scene crashes (setup or update). */
+  onRuntimeError?: (message: string) => void;
+};
 
-export default function ThreeDView({ spec }: Props) {
+export default function ThreeDView({ spec, onRuntimeError }: Props) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const reportedRef = useRef(false);
 
   useEffect(() => {
     setError(null);
+    reportedRef.current = false;
+    const reportError = (msg: string) => {
+      setError(msg);
+      if (!reportedRef.current) {
+        reportedRef.current = true;
+        onRuntimeError?.(msg);
+      }
+    };
     const mount = mountRef.current;
     if (!mount) return;
 
@@ -94,8 +107,10 @@ export default function ThreeDView({ spec }: Props) {
         | undefined;
       if (ret && typeof ret.update === "function") updateCb = ret.update;
     } catch (e) {
-      console.error("3D setup error", e);
-      setError(`3D scene crashed: ${(e as Error).message}`);
+      // Use warn (not error) so Next.js dev overlay doesn't surface the
+      // crash as an Issue — the orchestrator handles retries.
+      console.warn("3D setup error (will be reported for repair):", e);
+      reportError(`3D scene crashed: ${(e as Error).message}`);
     }
 
     // Auto-derive a reasonable initial framing from the group bbox.
@@ -131,7 +146,10 @@ export default function ThreeDView({ spec }: Props) {
       try {
         updateCb?.(t);
       } catch (e) {
-        console.error("3D update error", e);
+        console.warn("3D update threw (will be reported for repair):", e);
+        reportError(`3D scene update threw: ${(e as Error).message}`);
+        cancelAnimationFrame(raf);
+        return; // stop the loop; orchestrator will swap the spec out
       }
       renderer.render(scene, camera);
       raf = requestAnimationFrame(animate);
@@ -167,6 +185,10 @@ export default function ThreeDView({ spec }: Props) {
         else mat?.dispose?.();
       });
     };
+    // We deliberately do not depend on onRuntimeError so a parent re-render
+    // doesn't tear down the WebGL context. The ref captures the latest one
+    // through closure since it is stable across the spec lifetime.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spec]);
 
   return (

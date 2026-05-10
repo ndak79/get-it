@@ -34,6 +34,10 @@ export type PersistedTag = {
   concept: DetectedConcept;
   spec?: VizSpec;
   error?: string;
+  /** Number of completed generation calls for this tag (1 = initial, 2+ = retries). */
+  attempts?: number;
+  /** Last runtime error reported by the visualizer; used as repair context on retry. */
+  lastRuntimeError?: string;
 };
 
 export type PersistedDocState = {

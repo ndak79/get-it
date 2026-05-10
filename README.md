@@ -39,6 +39,23 @@ generates a spec for every detected tag, or waits for a click:
   until the user clicks a tag. A small "manual mode" chip shows up in
   the viewer header. Use this when iterating on the UI.
 
+### Auto-fix loop on visualizer crashes
+
+The Three.js / Canvas code that codex emits can occasionally fail to
+compile or run (a stray template-literal backtick, a missing return,
+calling a stub method). When that happens the visualizer captures the
+error, hands the broken `setup_code` plus the runtime message straight
+back to codex, and asks for a fix. We do this up to
+`NEXT_PUBLIC_MAX_VIZ_GEN_RETRIES` additional times (default 3, total of
+4 attempts).
+
+The repair call goes to the same `/api/generate-viz` endpoint with an
+extra `previousAttempt: { spec, runtimeError }` body, which prepends a
+"diagnose and fix" preamble to the system prompt and bumps reasoning
+effort one notch. The user sees the loader come back with a "repairing —
+attempt N of M" sub-line; if the budget runs out, the visualizer surfaces
+the final error.
+
 ### Tab-scoped persistence
 
 Viewer state is mirrored to `sessionStorage` so it survives F5 / Next.js

@@ -125,7 +125,10 @@ export function vizSchemaFor(type: VizType): object {
           type: { type: "string", const: "3d" },
           title: { type: "string", minLength: 2, maxLength: 80 },
           caption: { type: "string", minLength: 5, maxLength: 280 },
-          setup_code: { type: "string", minLength: 30, maxLength: 8000 },
+          // Very generous cap so codex never has to ration characters and
+          // truncate mid-expression. We trust the model to pick the right
+          // length for the concept — most scenes finish well under this.
+          setup_code: { type: "string", minLength: 30, maxLength: 64000 },
         },
       };
     case "2d-anim":
@@ -137,7 +140,7 @@ export function vizSchemaFor(type: VizType): object {
           type: { type: "string", const: "2d-anim" },
           title: { type: "string", minLength: 2, maxLength: 80 },
           caption: { type: "string", minLength: 5, maxLength: 280 },
-          setup_code: { type: "string", minLength: 30, maxLength: 8000 },
+          setup_code: { type: "string", minLength: 30, maxLength: 64000 },
         },
       };
     case "2d-text":

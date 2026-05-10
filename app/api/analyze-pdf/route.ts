@@ -48,13 +48,17 @@ RULES
    passage text (no paraphrase). The tag pill will be planted right after
    this anchor — so the anchor string MUST appear once, and the renderer
    anchors at its tail. Pick anchors that are unique on the page.
-3. "label" is what shows on the pill (≤ 35 chars), in the language of the
-   surrounding text.
-4. "context" gives the visualizer everything it needs to render the concept
+3. LANGUAGE: detect the language of the page text and write BOTH "label"
+   and "context" in that same language so they read naturally next to the
+   source. Italian page → Italian outputs, English page → English outputs,
+   etc. Never translate the source.
+4. "label" is what shows on the pill (≤ 35 chars). Make it a short noun
+   phrase the reader would skim and instantly recognise.
+5. "context" gives the visualizer everything it needs to render the concept
    without re-reading the full page: include the concept name, key
    parameters mentioned in the text, and the field of study. 1–3 sentences.
-5. Avoid trivial picks (page numbers, headings, generic phrases). Avoid
-   duplicates with the same concept across the page.
+6. Avoid trivial picks (page numbers, headings, generic phrases). Avoid
+   duplicates of the same concept across the page.
 
 OUTPUT
 A single JSON object conforming to the supplied schema. No prose.`;

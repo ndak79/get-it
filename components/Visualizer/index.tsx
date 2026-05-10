@@ -29,9 +29,16 @@ type Props = {
   spec: VizSpec | null;
   loading?: boolean;
   emptyHint?: string;
+  /** Loader sub-line (e.g. "fixing… (attempt 2/4)"). */
+  loadingDetail?: string;
+  /**
+   * Called by the renderer if the spec failed to compile or run. The
+   * orchestrator decides whether to retry via codex.
+   */
+  onRuntimeError?: (message: string) => void;
 };
 
-export default function Visualizer({ spec, loading, emptyHint }: Props) {
+export default function Visualizer({ spec, loading, emptyHint, loadingDetail, onRuntimeError }: Props) {
   return (
     <div className="flex h-full flex-col bg-white">
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-white px-5 py-2">
@@ -76,6 +83,9 @@ export default function Visualizer({ spec, loading, emptyHint }: Props) {
                   <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--ink-400)] [animation-delay:300ms]" />
                 </div>
                 <p className="text-xs">codex is composing the visualization</p>
+                {loadingDetail && (
+                  <p className="text-[11px] text-[var(--ink-400)]">{loadingDetail}</p>
+                )}
               </div>
             </motion.div>
           )}
@@ -118,11 +128,11 @@ export default function Visualizer({ spec, loading, emptyHint }: Props) {
               transition={{ duration: 0.2 }}
               className="absolute inset-0"
             >
-              {spec.type === "3d" && <ThreeDView spec={spec} />}
-              {spec.type === "2d-anim" && <TwoDAnimView spec={spec} />}
+              {spec.type === "3d" && <ThreeDView spec={spec} onRuntimeError={onRuntimeError} />}
+              {spec.type === "2d-anim" && <TwoDAnimView spec={spec} onRuntimeError={onRuntimeError} />}
               {spec.type === "2d-text" && <TwoDTextView spec={spec} />}
               {spec.type === "formula" && <FormulaView spec={spec} />}
-              {spec.type === "graph" && <GraphView spec={spec} />}
+              {spec.type === "graph" && <GraphView spec={spec} onRuntimeError={onRuntimeError} />}
             </motion.div>
           )}
         </AnimatePresence>
