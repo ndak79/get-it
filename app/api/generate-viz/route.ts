@@ -72,8 +72,7 @@ CONSTRAINTS:
   - DO NOT touch 'document', 'window', 'fetch', 'import', 'require', 'eval'.
   - DO NOT use OrbitControls — the framework already auto-rotates the
     group and reacts to pointer drag/scroll. Ignore the 'controls' arg.
-  - Keep the total scene under ~80 primitives. AIM FOR setup_code UNDER
-    4000 CHARACTERS — running long risks truncation mid-expression.
+  - Keep the total scene under ~200 primitives.
   - All meshes MUST be added to 'group' (not 'scene') so the framework can
     orbit them.
   - Use plain string concatenation ('foo ' + x) NOT template literals
@@ -126,11 +125,6 @@ CONSTRAINTS:
   - Restart the animation cleanly when 'time' resets to 0.
   - Use plain string concatenation ('foo ' + x) NOT template literals
     (\`foo \${x}\`) — backticks tend to get mangled in JSON encoding.
-  - AIM FOR setup_code UNDER 4000 CHARACTERS — running long risks
-    truncation mid-expression. Prefer a tight, focused animation over
-    one with many details.
-  - Every '(' must close with ')', every '{' with '}', every '[' with ']'.
-    The body must end with the closing brace of its outermost function.
 
 Reply with the JSON object only.`,
 
@@ -204,10 +198,6 @@ function repairPreamble(prevSpec: VizSpec, runtimeError: string): string {
     prevSpec.type === "3d" || prevSpec.type === "2d-anim"
       ? prevSpec.setup_code
       : null;
-  const looksTruncated =
-    !!codeField &&
-    (codeField.length > 7500 ||
-      /Unexpected end of input|missing \) after|Unexpected token/i.test(runtimeError));
   return `THIS IS A REPAIR ATTEMPT.
 
 The previous response you produced was rendered by the client and CRASHED
@@ -215,23 +205,9 @@ with this runtime error:
 
   ${runtimeError}
 
-${codeField ? `The previous setup_code body was (${codeField.length} chars):\n\n--- BEGIN PREV CODE ---\n${codeField}\n--- END PREV CODE ---\n\n` : ""}${looksTruncated ? `THIS LOOKS LIKE A TRUNCATION. The previous code likely ran out of
-output budget mid-expression. Trade richness for completeness:
-
-  - aim for under 4000 characters of setup_code
-  - cut the number of meshes / draw calls (10–30 primitives is plenty)
-  - avoid long inline arrays of numbers
-  - every '(' must be matched with ')', every '{' with '}', every '['
-    with ']'; the BODY must end cleanly with the closing brace of the
-    function expression
-
-` : ""}Diagnose the cause (most common: truncation, mismatched parens, invalid
-JS token from template-literal mishaps, undefined identifiers, missing
-return, calling browser APIs that were forbidden, accessing
-controls.target when controls is a stub) and produce a corrected JSON
-object that compiles and runs end-to-end. Keep the same intent and style
-as before; do not rewrite from scratch unless the original direction is
-fundamentally broken.
+${codeField ? `The previous setup_code body was:\n\n--- BEGIN PREV CODE ---\n${codeField}\n--- END PREV CODE ---\n\n` : ""}Diagnose the cause and produce a corrected JSON object that compiles and
+runs end-to-end. Keep the same intent and style as before; do not rewrite
+from scratch unless the original direction is fundamentally broken.
 
 `;
 }
