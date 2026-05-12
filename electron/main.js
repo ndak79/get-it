@@ -174,7 +174,7 @@ async function startEmbeddedServer() {
   const standalone = resolveStandalonePath();
   if (!standalone) {
     dialog.showErrorBox(
-      "Get It — internal error",
+      "Get It. — internal error",
       "Could not find the embedded server. The packaged app is incomplete.",
     );
     app.quit();
@@ -234,7 +234,7 @@ function createMainWindow() {
     height: 820,
     minWidth: 960,
     minHeight: 600,
-    title: "Get It",
+    title: "Get It.",
     backgroundColor: "#ffffff",
     show: false,
     webPreferences: {
@@ -262,7 +262,7 @@ function createMainWindow() {
 
   if (!serverUrl) {
     dialog.showErrorBox(
-      "Get It — internal error",
+      "Get It. — internal error",
       "The embedded server did not start.",
     );
     app.quit();
@@ -288,12 +288,26 @@ onCodexStatusChange((status) => {
 });
 
 // ── Lifecycle ───────────────────────────────────────────────────────────
+
+/**
+ * Second-instance: another launch attempt while we're already running.
+ * The single-instance lock at the top of this file rejected that launch;
+ * here we receive a heads-up and surface the existing window. Cross-
+ * platform: on macOS clicking the dock icon doesn't trigger this — that's
+ * `activate` — but launching the .app a second time from Finder does.
+ * On Windows / Linux double-clicking the shortcut a second time is the
+ * common case.
+ */
 app.on("second-instance", () => {
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.focus();
-  }
+  focusMainWindow();
 });
+
+function focusMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  if (!mainWindow.isVisible()) mainWindow.show();
+  mainWindow.focus();
+}
 
 app.whenReady().then(async () => {
   try {
@@ -308,22 +322,42 @@ app.whenReady().then(async () => {
     createMainWindow();
   } catch (err) {
     dialog.showErrorBox(
-      "Get It — failed to start",
+      "Get It. — failed to start",
       String(err && err.message ? err.message : err),
     );
     app.quit();
   }
 });
 
+/**
+ * Closing the window = quitting the app. On macOS this overrides the
+ * platform convention (where the X just hides the window) because that's
+ * what the user explicitly asked for: one click on the red X and Get It.
+ * is fully gone.
+ *
+ * All persistence is synchronous (work-context, KG, tags, settings use
+ * fs.writeFileSync) and the renderer's debounced state flushes through
+ * `fetch(..., { keepalive: true })` so any save in flight at close time
+ * still lands on disk before we kill the server.
+ */
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  app.quit();
 });
 
-app.on("activate", () => {
-  // macOS dock click — recreate the window if everything was closed.
-  if (mainWindow == null && serverUrl) createMainWindow();
-});
-
-app.on("before-quit", () => {
-  stopEmbeddedServer();
+/**
+ * Before-quit: give in-flight keepalive fetches a brief window to land
+ * before we tear down the embedded server. 350ms is enough for a localhost
+ * round-trip + synchronous writeFileSync without being noticeable to the
+ * user. We use app.exit() instead of letting the event loop drain because
+ * Electron occasionally hangs on its own GPU-process teardown otherwise.
+ */
+let quitting = false;
+app.on("before-quit", (event) => {
+  if (quitting) return; // re-entry from our own exit() — let it through
+  event.preventDefault();
+  quitting = true;
+  setTimeout(() => {
+    stopEmbeddedServer();
+    app.exit(0);
+  }, 350);
 });

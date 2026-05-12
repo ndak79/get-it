@@ -103,7 +103,11 @@
       "category": "public.app-category.education",
       "target": "dmg",
       "hardenedRuntime": false,
-      "gatekeeperAssess": false
+      "gatekeeperAssess": false,
+      "extendInfo": {
+        "CFBundleName": "Get It.",
+        "CFBundleDisplayName": "Get It."
+      }
     },
     "win": {
       "target": "nsis"

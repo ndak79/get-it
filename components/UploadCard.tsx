@@ -120,7 +120,13 @@ export default function UploadCard() {
   return (
     <div className="mx-auto w-full max-w-4xl px-10 py-14">
       <h1 className="text-balance text-[44px] font-bold leading-[1.08] tracking-tight text-[var(--ink-900)]">
-        Read it. See it. Get it.
+        Read it. See it.{" "}
+        <span
+          className="font-black tracking-[-0.02em] text-[var(--accent-600)]"
+          style={{ fontSize: "1.28em" }}
+        >
+          Get It.
+        </span>
       </h1>
 
       <p className="mt-7 max-w-2xl text-[15px] leading-[1.65] text-[var(--ink-700)]">
