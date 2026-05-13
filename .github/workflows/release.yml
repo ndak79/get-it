@@ -30,13 +30,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Both macOS builds run on macos-latest (Apple Silicon) because
+          # Intel runners are being deprecated by GitHub and queue times for
+          # macos-13 are unreliable. The Intel slice cross-builds via
+          # electron-builder's `--mac --x64` from the arm64 host — there are
+          # no native modules in the bundle (standalone Next.js server is
+          # pure JS) and the matching Codex binary is fetched from npm
+          # per-target by scripts/electron-prepare.mjs, so the resulting
+          # x64 .dmg ships exactly what an Intel Mac needs.
           - label: macOS (Apple Silicon)
-            os: macos-14
+            os: macos-latest
             target: mac-arm64
             triple: darwin-arm64
             artifact: dist-electron/*.dmg
-          - label: macOS (Intel)
-            os: macos-13
+          - label: macOS (Intel, cross-built on arm64)
+            os: macos-latest
             target: mac-x64
             triple: darwin-x64
             artifact: dist-electron/*.dmg
