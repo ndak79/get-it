@@ -377,6 +377,17 @@ function focusMainWindow() {
   mainWindow.focus();
 }
 
+// ── Bootstrap guard ─────────────────────────────────────────────────────
+// We open transient windows BEFORE the main window: the update modal and
+// the codex setup wizard. When the user dismisses one of those (e.g. clicks
+// "Later" on the update prompt), it briefly becomes the last open window,
+// which would normally trip `window-all-closed` and quit the app — making
+// it look like nothing happens after the modal closes. While we're still
+// booting, the explicit code path (this whenReady handler) decides when to
+// quit; the auto-quit on last-window-close only kicks in once the main
+// window has actually opened.
+let bootstrapping = true;
+
 app.whenReady().then(async () => {
   try {
     // Update check runs BEFORE anything else — the wizard, the embedded
@@ -398,7 +409,9 @@ app.whenReady().then(async () => {
     }
     await startEmbeddedServer();
     createMainWindow();
+    bootstrapping = false;
   } catch (err) {
+    bootstrapping = false;
     dialog.showErrorBox(
       "Get It. — failed to start",
       String(err && err.message ? err.message : err),
@@ -413,12 +426,17 @@ app.whenReady().then(async () => {
  * what the user explicitly asked for: one click on the red X and Get It.
  * is fully gone.
  *
+ * While bootstrapping is true the auto-quit is suppressed — the boot
+ * handler above is the source of truth for whether we should stop. Once
+ * the main window opens, this becomes the normal quit-on-close behaviour.
+ *
  * All persistence is synchronous (work-context, KG, tags, settings use
  * fs.writeFileSync) and the renderer's debounced state flushes through
  * `fetch(..., { keepalive: true })` so any save in flight at close time
  * still lands on disk before we kill the server.
  */
 app.on("window-all-closed", () => {
+  if (bootstrapping) return;
   app.quit();
 });
 
