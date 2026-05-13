@@ -1,6 +1,6 @@
 <div align="center">
 
-# Get It
+# Get It.
 
 ### Read it. See it. Get it.
 
@@ -21,17 +21,17 @@
 
 <br />
 
-![Get It — hero animation](hero.gif)
+![Get It. — hero animation](hero.gif)
 
 </div>
 
 ---
 
-## Why Get It exists
+## Why Get It. exists
 
 Students already have the PDF. They don't need another summary. They need to **see** the parts of the document that text alone refuses to explain, and they need to **prove to themselves** that they have understood — concept by concept, not page by page. Today that proof is missing: flashcard ratings measure recall in the moment, mindmaps measure how much you drew, summaries measure how patient the AI was. None of these answer the only question that matters on exam day: *would I survive a question I have not seen before?*
 
-Get It is the layer that answers it. Drop a PDF. Watch the document tag itself with the concepts that benefit from a picture; watch the right pane fill in with 3D models, animations, formulas with derivations, plotted graphs, and cited sources. Open the **Knowledge Graph**, see the document's own backbone laid out as a concept map, every node carrying four scores: **memory, comprehension, structure, application**. Talk to the document in **chat**. Run yourself through an **active-recall deck**. Or — the showpiece — explain a topic to a curious eight-year-old in a **Feynman session** and watch your mastery scores rise as you teach. Every interaction feeds one journal; one evaluator agent reads that journal and back-reflects four numbers per concept onto the graph. The student becomes visible to themselves.
+Get It. is the layer that answers it. Drop a PDF. Watch the document tag itself with the concepts that benefit from a picture; watch the right pane fill in with 3D models, animations, formulas with derivations, plotted graphs, and cited sources. Open the **Knowledge Graph**, see the document's own backbone laid out as a concept map, every node carrying four scores: **memory, comprehension, structure, application**. Talk to the document in **chat**. Run yourself through an **active-recall deck**. Or — the showpiece — explain a topic to a curious eight-year-old in a **Feynman session** and watch your mastery scores rise as you teach. Every interaction feeds one journal; one evaluator agent reads that journal and back-reflects four numbers per concept onto the graph. The student becomes visible to themselves.
 
 > *"Their knowledge is so fragile."* — Richard Feynman, 1985.<br />
 > *"What I cannot create, I do not understand."* — Richard Feynman, last blackboard at Caltech, 1988.
@@ -53,7 +53,7 @@ We took both lines literally.
 
 ## Install (no terminal)
 
-Get It is a desktop app. **Download the installer for your machine**, double-click, follow the one-time onboarding (sign in to ChatGPT or OpenAI), and you're done.
+Get It. is a desktop app. **Download the installer for your machine**, double-click, follow the one-time onboarding (sign in to ChatGPT or OpenAI), and you're done.
 
 | Platform | Installer |
 |---|---|
@@ -68,11 +68,11 @@ Builds for every released version are on the **[Releases](https://github.com/bel
 
 Sign in to your **ChatGPT or OpenAI** account once — that's the only setup. Drop a PDF in, or pick one of the five bundled samples (anatomy, classical mechanics, Italian constitution, calculus, organic chemistry). Tags, chats, flashcard decks, Feynman sessions, knowledge graph: all stay on your computer, never on a server. Come back tomorrow and **Library** has every PDF you've opened, picked up exactly where you left them.
 
-Get It checks for a newer release on every launch and offers a one-click update — nothing to subscribe to, nothing to babysit.
+Get It. checks for a newer release on every launch and offers a one-click update — nothing to subscribe to, nothing to babysit.
 
 ### Storage
 
-Get It stores everything on your machine — never on a server.
+Get It. stores everything on your machine — never on a server.
 
 | OS | Where your data lives |
 |---|---|

@@ -136,7 +136,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
-          name: Get It ${{ steps.tag.outputs.tag }}
+          name: Get It. ${{ steps.tag.outputs.tag }}
           generate_release_notes: true
           files: release/*
           draft: false

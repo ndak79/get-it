@@ -1,5 +1,5 @@
 /**
- * Get It — Codex CLI setup module.
+ * Get It. — Codex CLI setup module.
  *
  * Detects, installs/updates, and authenticates the Codex CLI before the
  * Next.js server starts — and again any time the renderer reports that a
@@ -392,7 +392,7 @@ async function showSetupWindow(opts = {}) {
     minimizable: false,
     maximizable: false,
     fullscreenable: false,
-    title: "Get It — Setup",
+    title: "Get It. — Setup",
     backgroundColor: "#ffffff",
     webPreferences: {
       preload: path.join(__dirname, "preload-wizard.js"),

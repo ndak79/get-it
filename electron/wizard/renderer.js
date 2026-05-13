@@ -36,7 +36,7 @@ function render(s) {
     els.btnInstall.disabled = false;
     els.btnInstall.textContent = "Install Codex CLI";
   } else if (!s.versionOk) {
-    els.installDesc.textContent = `Codex CLI ${s.version ?? "?"} is installed but Get It needs ≥ ${s.requiredVersion}. Update?`;
+    els.installDesc.textContent = `Codex CLI ${s.version ?? "?"} is installed but Get It. needs ≥ ${s.requiredVersion}. Update?`;
     els.btnInstall.disabled = false;
     els.btnInstall.textContent = "Update Codex CLI";
   } else {

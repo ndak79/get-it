@@ -1,5 +1,5 @@
 /**
- * Get It — Electron main process.
+ * Get It. — Electron main process.
  *
  * Responsibilities:
  *  1. Resolve the per-user data directory (Electron's userData) and expose

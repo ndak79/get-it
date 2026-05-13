@@ -29,7 +29,7 @@ const html = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Get It — Technical Writeup</title>
+<title>Get It. — Technical Writeup</title>
 <style>
   @page {
     size: A4;
