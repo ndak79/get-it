@@ -46,10 +46,13 @@ export async function GET() {
     const kgMtime = statMtime(kgPath(d.id));
     const kg = loadKG(d.id);
     const tags = loadTags(d.id);
+    const tagsMtime = tags ? tags.savedAt : null;
     const lastActivityAt = Math.max(
       d.uploadedAt,
+      d.lastOpenedAt ?? 0,
       wcMtime ?? 0,
       kgMtime ?? 0,
+      tagsMtime ?? 0,
       kg?.lastEvaluatedAt ?? 0,
     );
     return {

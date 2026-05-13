@@ -31,6 +31,10 @@ export type DocMeta = {
   filename: string;
   uploadedAt: number;
   numPages: number;
+  /** Epoch ms — last time the doc was opened in the viewer. Null until
+   *  the user first opens it. Updated via `touchDoc(id)` (called from
+   *  POST /api/doc/[id]/touch). */
+  lastOpenedAt?: number | null;
 };
 
 type StoreEntry = DocMeta & {
@@ -126,6 +130,33 @@ function lazyLoadFromDisk(docId: string): StoreEntry | undefined {
 
 export function getDoc(id: string): StoreEntry | undefined {
   return store.get(id) ?? lazyLoadFromDisk(id);
+}
+
+/**
+ * Bump the "last opened" timestamp on a doc and persist it both in
+ * meta.json and in the global docs index. Cheap (one JSON write each)
+ * and idempotent enough to call on every viewer mount. Library
+ * surfaces this via `lastActivityAt`.
+ */
+export function touchDoc(docId: string): DocMeta | null {
+  const docs = readIndex();
+  const idx = docs.findIndex((d) => d.id === docId);
+  if (idx < 0) return null;
+  const now = Date.now();
+  const next: DocMeta = { ...docs[idx], lastOpenedAt: now };
+  docs[idx] = next;
+  writeIndex(docs);
+  // Mirror onto meta.json so lazy-load picks it up after a restart.
+  try {
+    fs.writeFileSync(metaPath(docId), JSON.stringify(next, null, 2));
+  } catch {
+    /* ignore — index is authoritative */
+  }
+  const cached = store.get(docId);
+  if (cached) {
+    cached.lastOpenedAt = now;
+  }
+  return next;
 }
 
 export function deleteDoc(docId: string): boolean {

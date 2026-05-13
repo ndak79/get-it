@@ -84,6 +84,34 @@ export default function LibraryClient() {
     reload();
   }, [reload]);
 
+  // Auto-poll while at least one doc has background work in progress:
+  // tag detection still running (analyzedPages < numPages), or the KG
+  // still building, or some tags still generating. Same source as the
+  // viewer's TagsChip — keeps the badges live across multiple PDFs at
+  // once. Slows to idle cadence when everything is settled.
+  const anyDocWorking = useMemo(() => {
+    if (!rows) return false;
+    return rows.some((d) => {
+      if (d.kgStatus === "building") return true;
+      if (
+        d.tagsAnalyzedPages != null &&
+        d.tagsAnalyzedPages < d.numPages
+      ) return true;
+      if (
+        d.tagsTotal != null &&
+        d.tagsReady != null &&
+        d.tagsReady < d.tagsTotal
+      ) return true;
+      return false;
+    });
+  }, [rows]);
+  useEffect(() => {
+    if (!rows) return;
+    const interval = anyDocWorking ? 2000 : 8000;
+    const id = setInterval(reload, interval);
+    return () => clearInterval(id);
+  }, [reload, anyDocWorking, rows]);
+
   const handleDelete = useCallback(
     async (id: string) => {
       if (!confirm("Remove this document from your library? This deletes the PDF, work context, and knowledge graph for it.")) {
