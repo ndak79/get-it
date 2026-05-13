@@ -18,6 +18,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { randomInt } from "node:crypto";
 import { runJson } from "@/lib/codex";
 import { getDoc } from "@/lib/store";
 import {
@@ -36,6 +37,22 @@ import { scheduleEvaluation } from "@/lib/kg-runner";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
+
+/**
+ * Fisher–Yates with crypto.randomInt as the entropy source. Returns a new
+ * array so callers don't accidentally mutate the input. We pick crypto
+ * over Math.random because option order is the kind of thing a curious
+ * student WILL try to game ("the second option always seems to be right")
+ * and a PRNG would let them.
+ */
+function shuffle<T>(input: readonly T[]): T[] {
+  const arr = input.slice();
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = randomInt(0, i + 1);
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
 
 const SYSTEM = `You are Get It.'s quiz generator.
 
@@ -129,12 +146,27 @@ export async function POST(
     // outside 0..3 we treat the first option as correct rather than
     // throwing — the JSON Schema already enforces bounds but the
     // server-side guard keeps us safe if the schema is ever loosened.
-    const questions: QuizQuestion[] = data.questions.map((q) => ({
-      stem: q.stem,
-      options: q.options.slice(0, 4),
-      correctIndex: Math.min(3, Math.max(0, q.correctIndex | 0)),
-      explanation: q.explanation,
-    }));
+    //
+    // Then shuffle: LLMs have a strong positional bias toward placing
+    // the correct option at index 0 (it's the most natural way to write
+    // a "right answer + 3 distractors" list). If we left that bias in
+    // place every quiz would be trivially A-A-A-A. We shuffle each
+    // question's options independently with crypto-grade entropy and
+    // remap correctIndex so the right answer lands in a uniformly
+    // random slot.
+    const questions: QuizQuestion[] = data.questions.map((q) => {
+      const rawOptions = q.options.slice(0, 4);
+      const rawCorrect = Math.min(3, Math.max(0, q.correctIndex | 0));
+      const indices = shuffle([0, 1, 2, 3]);
+      const options = indices.map((i) => rawOptions[i]);
+      const correctIndex = indices.indexOf(rawCorrect);
+      return {
+        stem: q.stem,
+        options,
+        correctIndex,
+        explanation: q.explanation,
+      };
+    });
     const session: QuizSession = {
       id: newId(),
       topic,
