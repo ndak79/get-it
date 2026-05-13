@@ -37,7 +37,7 @@ const ORNAMENTS = [
 
 export default function Home() {
   return (
-    <main className="flex flex-1 min-h-0 flex-col bg-[var(--surface-canvas)] text-[var(--ink-900)]">
+    <main className="relative flex flex-1 min-h-0 flex-col bg-[var(--surface-canvas)] text-[var(--ink-900)]">
       {/* Top tab bar — Reflect-style browser-tabs */}
       <div className="tab-bar tab-bar--fused">
         <div className="tab-item" data-active="true">
@@ -80,13 +80,15 @@ export default function Home() {
         <div className="relative">
           <UploadCard />
         </div>
-        {/* Non-invasive version tag, bottom-right of the page */}
-        <div
-          className="pointer-events-none absolute bottom-3 right-4 text-[13px] font-medium tabular-nums text-[var(--ink-400)]"
-          aria-label={`Get It. version ${APP_VERSION}`}
-        >
-          v{APP_VERSION}
-        </div>
+      </div>
+      {/* Version tag — pinned to the bottom-right of the page so it stays
+          put when the content sheet scrolls. Sibling of the scroll
+          container, anchored against <main>. */}
+      <div
+        className="pointer-events-none absolute bottom-3 right-4 z-10 text-[13px] font-medium tabular-nums text-[var(--ink-400)]"
+        aria-label={`Get It. version ${APP_VERSION}`}
+      >
+        v{APP_VERSION}
       </div>
       <WelcomePopup />
     </main>
