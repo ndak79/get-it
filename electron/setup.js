@@ -446,6 +446,39 @@ async function showSetupWindow(opts = {}) {
   });
 }
 
+// Windows NT status codes we recognise from a non-zero codex.exe exit.
+// uv reports the raw NTSTATUS as an unsigned 32-bit integer; map the
+// ones that come back with a useful answer for the user.
+const WIN_EXIT_HINTS = {
+  // 0xC0000005 — STATUS_ACCESS_VIOLATION. The Rust binary crashed
+  // dereferencing an invalid pointer at (or near) startup. The single
+  // most common cause on a clean Windows VM / minimal install is the
+  // Microsoft Visual C++ Redistributable not being present: codex.exe
+  // is dynamically linked against VCRUNTIME140.dll / MSVCP140.dll and
+  // without those the OS loader leaves imports NULL.
+  3221225781:
+    "Codex CLI crashed at startup with a Windows access violation (0xC0000005). " +
+    "This almost always means the Microsoft Visual C++ Redistributable is missing on this machine. " +
+    "Install it from https://aka.ms/vs/17/release/vc_redist.x64.exe, restart, and try again.",
+  // 0xC000007B — STATUS_INVALID_IMAGE_FORMAT. The .exe is the wrong
+  // architecture for this CPU (or a dependent DLL is the wrong arch).
+  3221225595:
+    "Codex CLI cannot start: 0xC000007B (invalid image format). The binary architecture " +
+    "doesn't match this CPU. Common on Apple Silicon VMs that haven't enabled x86_64 " +
+    "translation, or on older 32-bit Windows.",
+  // 0xC0000135 — STATUS_DLL_NOT_FOUND. A required DLL is missing.
+  3221225477:
+    "Codex CLI cannot start: a required DLL is missing (0xC0000135). " +
+    "Install the Microsoft Visual C++ Redistributable from " +
+    "https://aka.ms/vs/17/release/vc_redist.x64.exe and try again.",
+};
+
+function explainCodexExitOnWindows(code, tail) {
+  if (process.platform !== "win32") return null;
+  if (typeof code !== "number") return null;
+  return WIN_EXIT_HINTS[code] || null;
+}
+
 // ── codex login subprocess driver ───────────────────────────────────────
 function runCodexLogin(onLine) {
   return new Promise((resolve, reject) => {
@@ -455,8 +488,13 @@ function runCodexLogin(onLine) {
       return;
     }
     const child = spawn(resolved.path, ["login"], {
-      stdio: ["ignore", "pipe", "pipe"],
+      // Pipe (not ignore) for stdin: some Rust console binaries crash
+      // on Windows when stdin is set to a null handle rather than a
+      // real pipe. We don't write anything, but the open pipe gives
+      // codex.exe a valid GetStdHandle(STD_INPUT_HANDLE).
+      stdio: ["pipe", "pipe", "pipe"],
       env: process.env,
+      windowsHide: true,
     });
     let stdoutBuf = "";
     let succeeded = false;
@@ -477,9 +515,13 @@ function runCodexLogin(onLine) {
       if (succeeded || code === 0) {
         resolve(true);
       } else {
-        // Useful detail when something went wrong
         const tail = stdoutBuf.split(/\r?\n/).slice(-3).join("\n").trim();
-        reject(new Error(tail || `codex login exited with code ${code}`));
+        const hint = explainCodexExitOnWindows(code, tail);
+        reject(
+          new Error(
+            hint || tail || `codex login exited with code ${code}`,
+          ),
+        );
       }
     });
     child.once("error", reject);

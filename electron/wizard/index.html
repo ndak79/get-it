@@ -74,6 +74,11 @@
         margin-bottom: 10px;
       }
       .step + .step { margin-top: 4px; }
+      /* The HTML `hidden` attribute applies `display: none` via the UA
+         stylesheet, but `.step { display: flex }` wins on specificity and
+         keeps a "hidden" step rendered as a flex container. Restore the
+         intent so the renderer's `el.hidden = true` actually hides it. */
+      .step[hidden] { display: none; }
       .step.active {
         border-color: var(--accent-100);
         box-shadow: 0 0 0 3px rgba(74, 108, 247, 0.07);
