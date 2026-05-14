@@ -102,16 +102,24 @@ fs.mkdirSync(path.join(DATA_DIR, "logs"), { recursive: true });
 const DEV_URL = process.env.ELECTRON_DEV_URL || null;
 
 function resolveStandalonePath() {
-  // Possible locations, in priority order:
-  //   1. <app root>/.next/standalone (running unpacked / inside the source tree)
-  //   2. process.resourcesPath/app.asar.unpacked/.next/standalone (packaged —
-  //      asarUnpack: [".next/standalone/**"] in package.json puts it here)
-  const candidates = [
-    path.join(app.getAppPath(), ".next", "standalone"),
-    process.resourcesPath
-      ? path.join(process.resourcesPath, "app.asar.unpacked", ".next", "standalone")
-      : null,
-  ].filter(Boolean);
+  // In packaged mode `app.getAppPath()` resolves to the asar archive
+  // (e.g. .../resources/app.asar). Electron's patched `fs` reads through
+  // asar transparently so `fs.existsSync` finds server.js inside it — but
+  // `child_process.spawn` uses native libuv which has no asar awareness,
+  // so passing an asar path as `cwd` makes CreateProcessW (Windows) /
+  // posix_spawn (mac) fail and Node surfaces it as `spawn <exe> ENOENT`
+  // (the exe is just what libuv puts in the error string; the real cause
+  // is the cwd not existing on disk). Always prefer the real on-disk
+  // unpacked directory in packaged mode — `.next/standalone/**` is in
+  // `asarUnpack` so it's there.
+  const candidates = [];
+  if (app.isPackaged && process.resourcesPath) {
+    candidates.push(
+      path.join(process.resourcesPath, "app.asar.unpacked", ".next", "standalone"),
+    );
+  }
+  // Dev / source-tree run: project root.
+  candidates.push(path.join(app.getAppPath(), ".next", "standalone"));
   for (const c of candidates) {
     if (fs.existsSync(path.join(c, "server.js"))) return c;
   }
@@ -220,6 +228,18 @@ async function startEmbeddedServer() {
   serverChild.stderr?.pipe(logStream);
   serverChild.once("exit", (code, signal) => {
     logStream.write(`\n[server exited code=${code} signal=${signal} ts=${new Date().toISOString()}]\n`);
+  });
+  // An unhandled 'error' event on the spawn becomes an uncaught
+  // exception that Electron surfaces as a generic "JavaScript error
+  // in the main process" dialog — exactly the cryptic crash users hit
+  // before this bug was caught. Catch the event, log it, and let
+  // waitForHttp time out so the boot handler can show a real message.
+  serverChild.on("error", (err) => {
+    try {
+      logStream.write(`\n[server spawn error ts=${new Date().toISOString()}]: ${err && err.stack ? err.stack : err}\n`);
+    } catch {
+      /* ignore */
+    }
   });
 
   serverUrl = `http://127.0.0.1:${port}`;

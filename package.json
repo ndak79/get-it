@@ -78,11 +78,9 @@
       "buildResources": "electron/assets",
       "output": "dist-electron"
     },
-    "asar": true,
-    "asarUnpack": [
-      "electron/codex-bin/**",
-      ".next/standalone/**"
-    ],
+    "afterSign": "scripts/electron-after-sign.cjs",
+    "afterPack": "scripts/electron-after-pack.cjs",
+    "asar": false,
     "files": [
       "electron/**/*",
       ".next/standalone/**",
@@ -98,10 +96,10 @@
     "mac": {
       "category": "public.app-category.education",
       "target": "dmg",
+      "identity": null,
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "extendInfo": {
-        "CFBundleName": "Get It.",
         "CFBundleDisplayName": "Get It."
       }
     },

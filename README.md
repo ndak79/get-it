@@ -90,12 +90,14 @@ The setup wizard verifies the bundled Codex CLI, walks the OAuth sign-in, and re
 
 ### Gatekeeper and SmartScreen
 
-Builds are unsigned. The first launch on macOS asks you to confirm the developer:
+Builds are **ad-hoc code-signed**, not notarized. A paid Apple Developer ID is a funding decision deferred for now; ad-hoc is the free path that still satisfies the Apple Silicon kernel's mandatory-signature requirement (without it M-series Macs report the bundle as "damaged" and refuse to open it at all).
 
-- **Easy.** Right-click on `Get It.app` → **Open** → confirm. macOS remembers the choice forever after.
-- **CLI.** `xattr -dr com.apple.quarantine "/Applications/Get It.app"`.
+The first launch on macOS still asks you to confirm the developer:
 
-Windows shows a similar SmartScreen warning the first time. Click **More info** → **Run anyway**.
+- **System Settings.** Double-click `Get It.app` → dismiss the "unidentified developer" warning → open **System Settings → Privacy & Security**, scroll to the "Get It.app was blocked" row, and click **Open Anyway**. macOS Sequoia (15) and macOS 26 removed the older right-click → Open shortcut, so this is the canonical path.
+- **CLI.** `xattr -dr com.apple.quarantine "/Applications/Get It.app"` strips the download-quarantine flag in one shot.
+
+Windows shows a SmartScreen warning the first time. Click **More info** → **Run anyway**.
 
 ### Storage
 

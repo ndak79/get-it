@@ -258,7 +258,7 @@ CI: pushing a `v*.*.*` tag to `main` triggers `.github/workflows/release.yml`. T
 3. Uploads each artefact to a workflow artifact.
 4. A final `publish` job collects them and creates the GitHub Release tied to the tag.
 
-Builds are unsigned. Real signing certificates are a deliberate choice deferred to a sustainable funding moment, not a missing piece of the architecture. The first-launch Gatekeeper / SmartScreen warning is dismissed once and never seen again.
+Builds are **ad-hoc code-signed** on macOS via an electron-builder `afterSign` hook (`scripts/electron-after-sign.cjs`) that runs `codesign --force --deep --sign -` over the staged `.app` before the `.dmg` is bundled. Ad-hoc satisfies the Apple Silicon kernel's mandatory-signature requirement — without it M-series Macs reject the bundle outright as "damaged" rather than showing the bypassable Gatekeeper prompt. Real Developer ID certificates + notarization remove the prompt entirely; that is a funding decision deferred to a sustainable moment, not a missing piece of the architecture. The first-launch Gatekeeper / SmartScreen warning is dismissed once via System Settings → Privacy & Security → Open Anyway and never seen again.
 
 ## Auto-update
 
@@ -302,7 +302,7 @@ A few choices are deliberately deferred.
 
 **A hosted multi-user backend.** Out of scope by design. Get It. runs locally against the user's own Codex login, against their own PDFs, on their own machine. The Braynr policy band (source-grounded only, local-first, tiered access) we get for free at this scale.
 
-**Code signing.** Unsigned builds today; the first-launch Gatekeeper / SmartScreen warning is dismissed once and not seen again. Real certificates are a funding decision.
+**Notarized code signing.** macOS builds are ad-hoc signed in CI (free, kernel-acceptable on Apple Silicon); a paid Developer ID + Apple notarization would remove the first-launch "unidentified developer" prompt entirely. That step is a funding decision, not a missing piece of the architecture.
 
 ---
 
