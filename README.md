@@ -4,7 +4,7 @@
 
 ### Read it. See it. Get it.
 
-**The study companion that turns a PDF into a measurable mastery map — built around the document, not in place of it.**
+**The study companion that turns a PDF into a measurable mastery map. Built around the document, not in place of it.**
 
 [![GDG AI Hack 2026](https://img.shields.io/badge/GDG%20AI%20Hack-Milan%202026-1a1a2e?style=for-the-badge)](https://gdg.community.dev/)
 [![Challenge: Braynr](https://img.shields.io/badge/Challenge-Braynr-6B5BFF?style=for-the-badge)](https://braynr.com)
@@ -21,177 +21,144 @@
 
 <br />
 
-![Get It. — hero animation](hero.gif)
+![Get It. hero animation](hero.gif)
 
 </div>
 
 ---
 
-## Why Get It. exists
+## The problem
 
-Students already have the PDF. They don't need another summary. They need to **see** the parts of the document that text alone refuses to explain, and they need to **prove to themselves** that they have understood — concept by concept, not page by page. Today that proof is missing: flashcard ratings measure recall in the moment, mindmaps measure how much you drew, summaries measure how patient the AI was. None of these answer the only question that matters on exam day: *would I survive a question I have not seen before?*
+The student already has the PDF. They don't need another summary. They need to see the parts a textbook refuses to draw, and they need a way to prove to themselves that they have understood. Concept by concept, not page by page.
 
-Get It. is the layer that answers it. Drop a PDF. Watch the document tag itself with the concepts that benefit from a picture; watch the right pane fill in with 3D models, animations, formulas with derivations, plotted graphs, and cited sources. Open the **Knowledge Graph**, see the document's own backbone laid out as a concept map, every node carrying four scores: **memory, comprehension, structure, application**. Talk to the document in **chat**. Run yourself through an **active-recall deck**, or a **forced-choice quiz** that pits the right answer against plausible distractors. Or — the showpiece — explain a topic to a curious eight-year-old in a **Feynman session** and watch your mastery scores rise as you teach. Every interaction feeds one journal; one evaluator agent reads that journal and back-reflects four numbers per concept onto the graph. The student becomes visible to themselves.
+Today's tools measure surface area, not depth. Flashcard ratings measure recall in the moment. Mind maps measure how much you drew. Summaries measure how patient the AI was. None of them answer the only question that matters on exam day:
 
-> *"Their knowledge is so fragile."* — Richard Feynman, 1985.<br />
-> *"What I cannot create, I do not understand."* — Richard Feynman, last blackboard at Caltech, 1988.
+> *Would I survive a question I have not seen before?*
 
-We took both lines literally.
+Get It. is the layer that answers it.
 
-And here's the part most AI study apps skip: **Get It. runs on the ChatGPT subscription you already pay for.** No second subscription, no Get It. Pro tier, no per-message metering, no "AI tokens" wallet. The app talks to OpenAI through the official Codex CLI signed in with *your* ChatGPT account — your tier is the tier you get. One subscription, zero markup.
+## How it works
+
+Drop a PDF. Three things start at once.
+
+1. **The page tags itself.** A concept-detection agent walks every page and plants inline tag pills on the words that benefit from a picture. Each tag carries a renderer choice: 3D scene, 2D animation, formula walkthrough, plotted graph, or cited source.
+2. **The right pane fills in.** Up to four visualizations render in parallel as the document is read. Three.js for anatomy and molecules, Canvas for physics and chemistry animations, KaTeX-clean formulas, a plot engine for functions and distributions, authoritative quotes for legal articles and named papers. When a sandbox crashes, the agent reads its own error and re-emits a fix. The student sees "repairing" instead of red text.
+3. **A knowledge graph builds itself.** Six to twenty-five concept nodes, typed edges, sized by mastery, coloured by progress, clickable for the four-axis breakdown plus the evaluator's note.
+
+Then the loop closes. Four study tools feed one journal.
+
+| Tool | What it measures |
+|---|---|
+| 💬 **Chat** | Recall references and paraphrases. Multi-turn, multi-thread, scoped to one document. |
+| 🎴 **Flashcards** | Open-recall under self-grade. Again / Hard / Good / Easy on every card. |
+| ✅ **Quizzes** | Forced-choice discrimination. One correct answer, three plausible distractors. |
+| 💡 **Feynman** | The agent plays a curious eight-year-old. *You* teach. The strongest comprehension signal. |
+
+After every completed session the **evaluator** agent reads the journal end-to-end and updates four scores per concept node on the knowledge graph: **memory, comprehension, structure, application**. Each scored 0 to 100. Each monotone non-decreasing by a runtime clamp. The student can only progress, never regress.
+
+The four numbers are the difference between a study app and a measurement instrument.
 
 ## Bring your own ChatGPT
 
-The AI side of Get It. has no business model layered on top. There is nothing to subscribe to here. You sign in once with the **ChatGPT account you already use** (or an OpenAI API key, if you prefer), and every agent inside the app — visualization generation, the knowledge graph, chat, flashcards, quizzes, Feynman — runs against your own quota through the official Codex CLI.
+The AI side of Get It. has no business model layered on top.
 
-What that means in practice:
+You sign in once with the ChatGPT account you already pay for (or an OpenAI API key) through the official Codex CLI. Every agent inside the app runs against your own tier. There is no Get It. server, no shared key pool, no per-message metering, no "AI credits" wallet, no second subscription, and no plan to ever ship one.
 
-- **You pay for AI once.** If you're already on ChatGPT Plus / Pro / Team / Enterprise / Edu, that subscription covers everything Get It. does. You don't need to buy Claude, Perplexity, Gemini Advanced, NotebookLM, or a dedicated "AI study app" credit pack on top.
-- **ChatGPT Plus is the practical floor.** The free ChatGPT tier *can* technically sign into Codex, but the limits are low enough that you'll bounce off them after the first few interactions; serious study sessions need Plus or higher. Higher tiers (Pro, Team, Enterprise, Edu) just give you more headroom in the same flow — same login, no app-side switch.
-- **Your data stays yours.** Every document, every chat thread, every flashcard rating, every quiz answer, every Feynman transcript, every knowledge-graph node lives on your disk under an OS-native data directory. We don't host a backend; we don't resell anything; the work-context journal is downloadable as a single JSON file from the right-pane menu.
-- **No "Get It. credits".** The only thing the app meters is your patience. If Codex hits a rate limit on your account, Get It. shows you a countdown banner and resumes the background work itself when the window clears — no second payment can buy past that, because there isn't one to buy.
+- **You pay for AI once.** ChatGPT Plus, Pro, Team, Enterprise, or Edu covers everything Get It. does.
+- **Plus is the practical floor.** The free tier signs in but its Codex allowance is intentionally small. Plus and above give comfortable session headroom in the same flow.
+- **Your data stays yours.** No backend, no upload step, no analytics. The work-context journal is a single JSON file on your disk, downloadable in one click from the right-pane menu.
+- **Rate limits are OpenAI's.** When you hit one, the app shows a countdown banner and resumes the background work itself once the window clears.
 
-That choice is the differentiator. Other study apps wrap a model API with a marked-up subscription on top. Get It. wraps a *study workflow* around the AI access you already have.
+Other AI study apps wrap a marked-up subscription around a model API the vendor holds. Get It. wraps a study workflow around the access you already have.
 
-## What it does
+## Install
 
-| | |
-|---|---|
-| 🎨 **Visualizer** | The right pane fills in by itself. Up to 4 concept visualizations render in parallel as the document is being read — Three.js scenes for anatomy and molecules, Canvas animations for inclined planes and pendulums, KaTeX for equations and step-by-step derivations, a plot engine for functions and distributions, cited markdown for legal articles and named statutes. |
-| 🧭 **Knowledge Graph** | A concept map of the document, built once at upload by a dedicated kg-build agent. Nodes are sized by mastery, colored by progress, clickable for the four-axis breakdown plus the evaluator's per-concept note. The macro learning path is right there on screen. |
-| 💬 **Chat** | Multi-turn, multi-thread Q&A grounded in the document. Every assistant reply triggers a debounced re-evaluation of the knowledge graph. |
-| 🎴 **Flashcards** | AI-generated active-recall decks per topic. Type your answer, reveal, self-grade 1–4 (Again / Hard / Good / Easy, FSRS convention). Closing a deck triggers an evaluator pass. |
-| ✅ **Quizzes** | Forced-choice multiple-choice quizzes per topic. Four options per question — one right, three plausible distractors crafted to expose the confusion the student would actually trip on. Each pick reveals an explanation; ending the quiz triggers an evaluator pass. |
-| 💡 **Feynman** | The agent plays a curious 8-year-old. *You* are the teacher. Three to four short, pointed prompts; you explain in plain words; the session ends with an honest summary of where the explanation held and where it broke down. The strongest signal we have for **comprehension**. |
-| 📊 **Four-axis evaluator** | After every completed interaction, a dedicated agent reads the full work-context journal and updates per-node scores along four dimensions. Scores are **monotone non-decreasing** — the student can only progress, never regress. |
-| 📚 **Library** | Every PDF you've ever opened is one click away. Tags, chats, flashcards, quizzes, Feynman sessions, knowledge graph — all picked up where you left them. Nothing leaves your machine. |
-| 📥 **Your data, downloadable** | One click in the right-pane menu pulls the entire work-context JSON — every chat message, every card rating, every quiz answer, every Feynman turn, every timestamp. The same file the evaluator reads. |
-
-## Install (no terminal)
-
-Get It. is a desktop app. **Download the installer for your machine**, double-click, follow the one-time onboarding (sign in with the ChatGPT account you already use — Plus or higher recommended; or an OpenAI API key), and you're done. There's nothing else to buy.
+Get It. is a desktop app. Download the installer for your machine, double-click, sign in with the ChatGPT account you already use. Nothing else to buy.
 
 | Platform | Installer |
 |---|---|
-| macOS (Apple Silicon — M1/M2/M3/M4) | `Get It-<version>-arm64.dmg` |
+| macOS (Apple Silicon, M1 / M2 / M3 / M4) | `Get It-<version>-arm64.dmg` |
 | macOS (Intel) | `Get It-<version>.dmg` |
-| Windows 10/11 (x64) | `Get It Setup <version>.exe` |
+| Windows 10 / 11 (x64) | `Get It Setup <version>.exe` |
 | Linux (x64) | `Get It-<version>.AppImage` |
 
-Builds for every released version are on the **[Releases](https://github.com/beltromatti/get-it/releases)** page.
+Every release ships on the **[Releases](https://github.com/beltromatti/get-it/releases)** page. The app checks for a newer build on every launch and offers a one-click update inside its own window.
 
 ### First launch
 
-Sign in once with the **ChatGPT account you already use** — that's the only setup. The app uses your own ChatGPT tier (Plus or higher gives a comfortable session; the free tier hits limits quickly); no separate Get It. subscription exists or ever will. Drop a PDF in, or pick one of the five bundled samples (anatomy, classical mechanics, Italian constitution, calculus, organic chemistry). Tags, chats, flashcard decks, quizzes, Feynman sessions, knowledge graph: all stay on your computer, never on a server. Come back tomorrow and **Library** has every PDF you've opened, picked up exactly where you left them.
+The setup wizard verifies the bundled Codex CLI, walks the OAuth sign-in, and refuses to open the main window until both gates are green. Then drop a PDF, or open one of the five bundled samples (anatomy, classical mechanics, Italian constitution, calculus, organic chemistry). Tags, chats, flashcard decks, quizzes, Feynman sessions, and the knowledge graph all stay on your computer.
 
-Get It. checks for a newer release on every launch and offers a one-click update — nothing to subscribe to, nothing to babysit.
+### Gatekeeper and SmartScreen
+
+Builds are unsigned. The first launch on macOS asks you to confirm the developer:
+
+- **Easy.** Right-click on `Get It.app` → **Open** → confirm. macOS remembers the choice forever after.
+- **CLI.** `xattr -dr com.apple.quarantine "/Applications/Get It.app"`.
+
+Windows shows a similar SmartScreen warning the first time. Click **More info** → **Run anyway**.
 
 ### Storage
 
-Get It. stores everything on your machine — never on a server.
+Everything lives under one OS-native directory.
 
-| OS | Where your data lives |
+| OS | Path |
 |---|---|
 | macOS | `~/Library/Application Support/get-it/` |
 | Windows | `%APPDATA%\get-it\` |
 | Linux | `~/.local/share/get-it/` |
 
-Layout: one folder per document under `docs/<docId>/` (source PDF + extracted text cache + tags + work context + knowledge graph), plus a `docs.json` index, a `codex-scratch/` working dir, and `logs/` for the embedded server. Deleting a doc from the Library wipes the whole folder.
+Layout: one folder per document at `docs/<docId>/` (source PDF, extracted text cache, tags, work context, knowledge graph), a `docs.json` index at the root, a `codex-scratch/` working dir, and `logs/`. Deleting a doc from the Library wipes the whole folder.
 
-### macOS Gatekeeper (first launch only)
-
-The builds linked above are unsigned (we're a hackathon project — code-signing certs cost real money). The very first time you open the app, macOS will say it can't verify the developer. Two ways through:
-
-- **Easy**: Right-click on `Get It.app` → **Open** → confirm. macOS remembers your choice for every subsequent launch.
-- **CLI**: `xattr -dr com.apple.quarantine "/Applications/Get It.app"`
-
-Windows shows a similar SmartScreen warning the first time. Click **More info → Run anyway**.
-
-## Architecture in one breath
-
-```
-upload  ─┬──► visualizer pipeline ─► concept tags + 3D / anim / formula /
-         │                            graph / cited-text spec, in parallel,
-         │                            with auto-repair on runtime errors
-         │
-         └──► knowledge-graph pipeline ─► kg-build (once)  +
-                                           kg-evaluate (debounced, after every
-                                           tool interaction; per-doc queue;
-                                           monotone clamp on every update)
-```
-
-Every agent — concept detection, visualization spec, kg-build, kg-evaluate, chat, flashcard generation, quiz generation, Feynman child, Feynman summary — is a single `codex exec` invocation through `@openai/codex-sdk`, constrained by a strict per-call JSON Schema. **Nine prompts behind one auth path. Nine schemas behind one shared SDK wrapper.** No god-prompt. No black box.
-
-Detection and per-tag visualization generation aren't renderer loops — they're first-class **server-side jobs**, singleton-per-doc and idempotent. Open a PDF, navigate to Library, open another PDF, leave the window minimised: every doc you've touched keeps its agents running in the background, library badges update live, and you can come back hours later to find work finished without re-doing anything. Multiple PDFs progress in parallel.
-
-The desktop app is a thin Electron shell over the same Next.js 16 application that we ran in the browser at the hackathon. The shell:
-
-- ships the Codex CLI binary inside the bundle so users don't install anything by hand,
-- on every launch, before anything else, checks GitHub Releases for a newer build and offers an in-app one-click update,
-- runs a first-launch wizard that handles installation gaps and the OAuth login,
-- spawns the Next.js standalone server on a free localhost port and points a single Chromium window at it,
-- watches Codex for auth loss and rate-limit hits, and re-enters the setup wizard or shows a countdown banner without losing any work,
-- persists everything to the OS-native user-data directory.
-
-The full architecture is in [`technical-writeup.md`](technical-writeup.md) (also rendered as a [PDF](technical-writeup.pdf)).
-
-## Hack on it (developer mode)
+## Hack on it
 
 ```bash
 git clone https://github.com/beltromatti/get-it.git
 cd get-it
 npm install
-npm run dev                   # builds + opens the packaged Electron app
+npm run dev    # builds the Next.js standalone bundle and opens it in Electron
 ```
 
-`npm run dev` builds the Next.js standalone bundle and runs it inside Electron — that's the loop the end user gets, and the one that exercises the setup wizard, the embedded server, and the IPC bridge. Re-run it after edits.
+`npm run dev` exercises the full path: setup wizard, embedded server, IPC bridge. Re-run after edits.
 
-If you prefer browser-side hot reload, run Next on its own and open it in Chrome / Safari:
+For browser-side hot reload:
 
 ```bash
-npm run browser:dev           # http://localhost:3000
+npm run browser:dev    # http://localhost:3000
 ```
 
-(Heads up: there's a known Next 16.2.6 + Turbopack + Chromium 130 hydration glitch that breaks `next dev` *inside* Electron — the WebSocket HMR handshake fails and React never hydrates. So we don't recommend `dev:hmr` for day-to-day work. Browser dev or rebuild-and-test is the cleaner loop.)
+(The Electron-internal HMR loop has a known Next 16.2.6 + Turbopack + Chromium 130 hydration glitch, so browser dev or rebuild-and-test is the cleaner inner loop.)
 
-To make a desktop build locally for one or all targets:
+Local desktop builds, one or all targets:
 
 ```bash
-npm run build                       # next build (creates .next/standalone)
-npm run electron:prepare            # stages public/ + static/ + host codex binary
+npm run build && npm run electron:prepare
 
-# Single target:
-node scripts/build-electron.mjs --target=mac-arm64
-node scripts/build-electron.mjs --target=mac-x64
-node scripts/build-electron.mjs --target=win-x64
-
-# All three sequentially:
-node scripts/build-electron.mjs --all
+node scripts/build-electron.mjs --target=mac-arm64   # or mac-x64 / win-x64 / --all
 ```
 
-The artefacts land in `dist-electron/`. The cross-arch builds will fetch the matching Codex platform package from npm on the fly — you don't need an Intel Mac or a Windows VM, the script downloads what it needs.
+Artefacts land in `dist-electron/`. Cross-arch builds pull the matching Codex platform package from npm on the fly, so you do not need an Intel Mac or a Windows VM to build for them.
 
-For releases, push a `vX.Y.Z` tag to `main` — the `.github/workflows/release.yml` workflow builds every target in parallel on its native runner and attaches the artefacts to a GitHub Release.
+Releases are tag-driven. Push a `vX.Y.Z` tag to `main` and `.github/workflows/release.yml` builds every target on a native runner, attaches the `.dmg` / `.exe` / `.AppImage` to a GitHub Release, and pins the version into Info.plist and NSIS metadata from the tag itself.
 
 ## The team
 
-Built in 24 hours at **GDG AI Hack 2026, Milan**, for the **Braynr** challenge. The hackathon submission lived at commit `277ec43`; everything you see beyond that commit is post-hackathon polish — most notably the desktop packaging, the persistent library, and the first-launch setup wizard. The product is the same; only the way it gets onto a student's laptop has changed.
+Built in 24 hours at **GDG AI Hack 2026, Milan**, for the **Braynr** challenge. The hackathon submission lived at commit `277ec43`. Everything past that commit is post-hackathon polish: desktop packaging, the persistent Library, the first-launch setup wizard, the quizzes tool, the in-app auto-update flow, the server-side jobs runner. The product is the same. Only the way it gets onto a student's laptop has changed.
 
-- **Mattia Beltrami** — Politecnico di Milano
-- **Matteo Impieri** — Politecnico di Milano
-- **Filippo Difronzo** — Politecnico di Milano
-- **Luca Feggi** — Università di Padova
+- **Mattia Beltrami**, Politecnico di Milano
+- **Matteo Impieri**, Politecnico di Milano
+- **Filippo Difronzo**, Politecnico di Milano
+- **Luca Feggi**, Università di Padova
 
-## Want the deeper read
+## Deeper read
 
-[`technical-writeup.md`](technical-writeup.md) — the full design rationale: the four-axis rubric, the per-doc evaluator queue, the parallel visualizer agents, the LLM-code sandbox, the work-context journal, the 14 lessons from learning research that shaped the UX, and the desktop-packaging layer that wraps it all. Also rendered as [`technical-writeup.pdf`](technical-writeup.pdf).
+The full architecture, design rationale, and engineering choices are in [`technical-writeup.md`](technical-writeup.md), also as [PDF](technical-writeup.pdf). It covers the agent layer, the four-axis rubric, the per-doc evaluator queue, the parallel visualizer jobs, the LLM-code sandbox, the work-context journal, the bring-your-own-account transport, and the desktop-packaging layer.
 
 ## Notice
 
-**Get It. is an independent project. It is not affiliated with, endorsed by, sponsored by, or otherwise associated with OpenAI.** The app uses the official open-source [Codex CLI](https://github.com/openai/codex) as the transport between the local app and OpenAI's models, signed in with the end user's own ChatGPT or OpenAI API account. "OpenAI", "ChatGPT", and "Codex" are trademarks of their respective owner — we use the names only to describe what Get It. interoperates with.
+**Get It. is an independent project. It is not affiliated with, endorsed by, or sponsored by OpenAI.** The app uses the official open-source [Codex CLI](https://github.com/openai/codex) as the transport between the local app and OpenAI's models, signed in with the end user's own ChatGPT or OpenAI API account. "OpenAI", "ChatGPT", and "Codex" are trademarks of their respective owner; we use the names only to describe what Get It. interoperates with.
 
-Your use of the AI capabilities surfaced inside Get It. is subject to **OpenAI's own terms** ([Terms of Use](https://openai.com/policies/terms-of-use), [Usage Policies](https://openai.com/policies/usage-policies), [Privacy Policy](https://openai.com/policies/privacy-policy)) and to the Codex CLI's [own license and notes](https://github.com/openai/codex). When in doubt, consult those documents — they are the authoritative source for what the underlying model service permits, how data is handled on OpenAI's side, and what your account-tier allowances actually are.
+Your use of OpenAI's models through Get It. is subject to OpenAI's own [Terms of Use](https://openai.com/policies/terms-of-use), [Usage Policies](https://openai.com/policies/usage-policies), and [Privacy Policy](https://openai.com/policies/privacy-policy), and to the Codex CLI's [own license and release notes](https://github.com/openai/codex). Those documents are authoritative for what the model service permits, how data is handled on OpenAI's side, and what each subscription tier covers.
 
 ## License
 
-Apache License 2.0 — see [`LICENSE`](LICENSE). You may use, modify, and redistribute Get It. under the terms of that license. Built for an open hackathon and continued in public; contributions welcome.
+Apache License 2.0. See [`LICENSE`](LICENSE). Source is open. Contributions are welcome.

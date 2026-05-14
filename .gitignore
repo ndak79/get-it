@@ -47,3 +47,4 @@ next-env.d.ts
 /dist-electron/
 # staged codex binary per target — fetched on demand by electron-prepare
 /electron/codex-bin/
+snaps-mobile/
