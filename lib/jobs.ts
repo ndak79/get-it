@@ -130,6 +130,7 @@ async function runDetection(docId: string) {
 
   const inFlightPages = new Set<number>();
   let rateLimitedRetryAt: number | null = null;
+  let terminalCodexError: CodexError | null = null;
 
   await new Promise<void>((resolve) => {
     let active = 0;
@@ -153,6 +154,11 @@ async function runDetection(docId: string) {
             // the whole detection job once the window clears.
             if (e instanceof CodexError && e.kind === "rate_limit" && e.retryAt) {
               rateLimitedRetryAt = e.retryAt;
+            } else if (
+              e instanceof CodexError &&
+              (e.kind === "binary_missing" || e.kind === "auth_lost")
+            ) {
+              terminalCodexError = e;
             } else {
               console.warn(
                 "[jobs/detect-page]",
@@ -165,7 +171,7 @@ async function runDetection(docId: string) {
           .finally(() => {
             inFlightPages.delete(page);
             active--;
-            if (rateLimitedRetryAt) {
+            if (rateLimitedRetryAt || terminalCodexError) {
               // Bail out of this run — schedule retry below.
               if (active === 0 && !done) {
                 done = true;
@@ -180,6 +186,10 @@ async function runDetection(docId: string) {
 
     pump();
   });
+
+  if (terminalCodexError) {
+    throw terminalCodexError;
+  }
 
   if (rateLimitedRetryAt) {
     const wait = Math.max(1000, rateLimitedRetryAt - Date.now() + 500);

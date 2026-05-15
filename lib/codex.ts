@@ -9,10 +9,10 @@
  *     generic). Every agent call funnels through here, so the rest of the
  *     app gets a single, stable shape to display.
  *
- * Note on the Codex binary: it ships *inside* node_modules via the
- * `@openai/codex` npm package + platform-specific optional deps. The SDK
- * locates and spawns it automatically — see codex-sdk/dist/index.js. No
- * system-wide install is required.
+ * Note on the Codex binary: in packaged Electron builds the main process
+ * resolves the bundled binary and exposes its absolute path through
+ * CODEX_BINARY_PATH. Passing that path to the SDK avoids fragile
+ * node_modules lookup from the standalone Next server.
  */
 
 import { Codex } from "@openai/codex-sdk";
@@ -23,7 +23,9 @@ let _codex: Codex | null = null;
 
 function getCodex(): Codex {
   if (_codex) return _codex;
+  const codexPathOverride = process.env.CODEX_BINARY_PATH;
   _codex = new Codex({
+    ...(codexPathOverride ? { codexPathOverride } : {}),
     config: {
       // disable image generation so we can use 'low' reasoning; the demo is
       // text-only so there is nothing to lose.
