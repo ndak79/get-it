@@ -46,9 +46,8 @@ export type RunOptions = {
   threadOverrides?: Partial<ThreadOptions>;
 };
 
-function buildThread(opts: RunOptions = {}) {
-  const codex = getCodex();
-  return codex.startThread({
+function threadOptions(opts: RunOptions = {}): ThreadOptions {
+  return {
     sandboxMode: "read-only",
     approvalPolicy: "never",
     skipGitRepoCheck: true,
@@ -56,7 +55,22 @@ function buildThread(opts: RunOptions = {}) {
     modelReasoningEffort: opts.reasoning ?? "low",
     webSearchEnabled: opts.webSearch ?? false,
     ...(opts.threadOverrides ?? {}),
-  });
+  };
+}
+
+function buildThread(opts: RunOptions = {}) {
+  return getCodex().startThread(threadOptions(opts));
+}
+
+/** Strip markdown code fences the model sometimes wraps JSON in, then parse. */
+function parseTurnJson<T>(finalResponse: string | undefined): T {
+  const text = finalResponse?.trim();
+  if (!text) throw new Error("Empty finalResponse from codex");
+  const cleaned = text
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/```$/i, "")
+    .trim();
+  return JSON.parse(cleaned) as T;
 }
 
 /**
@@ -255,13 +269,7 @@ export async function runJson<T>(
         outputSchema,
         signal: opts.signal,
       });
-      const text = turn.finalResponse?.trim();
-      if (!text) throw new Error("Empty finalResponse from codex");
-      const cleaned = text
-        .replace(/^```(?:json)?\s*/i, "")
-        .replace(/```$/i, "")
-        .trim();
-      const parsed = JSON.parse(cleaned) as T;
+      const parsed = parseTurnJson<T>(turn.finalResponse);
       markOk();
       return { data: parsed, usage: turn.usage };
     } catch (err) {
@@ -270,6 +278,78 @@ export async function runJson<T>(
       // Auth/rate-limit/binary failures: don't bother retrying — the
       // condition isn't going to clear in 200ms. Bubble up immediately so
       // the in-app banner can take over.
+      if (classified.kind !== "generic") {
+        markError(classified);
+        throw classified;
+      }
+    }
+  }
+  const finalErr = classifyCodexError(lastErr);
+  if (finalErr.kind !== "generic") markError(finalErr);
+  throw finalErr;
+}
+
+/**
+ * Thread-aware JSON runner for multi-turn tools (chat).
+ *
+ * Two modes, exactly one of which must be supplied:
+ *   • start  — open a NEW thread and send the full first-turn prompt (system
+ *              + document + history). Returns the new `threadId` to persist.
+ *              Retries once on a parse blip, like runJson.
+ *   • resume — continue an EXISTING thread by `threadId`, sending only the new
+ *              turn input. The model still has the document + prior turns in
+ *              its own context, so we don't resend them (and the stable prefix
+ *              is a guaranteed cache hit). No internal retry: on any generic
+ *              failure (including a lost/expired session) the caller falls
+ *              back to `start` with full context, so a resume never silently
+ *              degrades the answer.
+ *
+ * Rate-limit / auth / binary errors are classified and thrown immediately in
+ * both modes so the health banner takes over.
+ */
+export async function runJsonInThread<T>(args: {
+  outputSchema: object;
+  opts?: RunOptions;
+  resume?: { threadId: string; input: string };
+  start?: { input: string };
+}): Promise<{ data: T; usage: unknown; threadId: string | null }> {
+  const preflight = preflightHealth();
+  if (preflight) throw preflight;
+  const opts = args.opts ?? {};
+
+  if (args.resume) {
+    const thread = getCodex().resumeThread(args.resume.threadId, threadOptions(opts));
+    try {
+      const turn = await thread.run(args.resume.input, {
+        outputSchema: args.outputSchema,
+        signal: opts.signal,
+      });
+      const parsed = parseTurnJson<T>(turn.finalResponse);
+      markOk();
+      return { data: parsed, usage: turn.usage, threadId: thread.id ?? args.resume.threadId };
+    } catch (err) {
+      const classified = classifyCodexError(err);
+      if (classified.kind !== "generic") markError(classified);
+      throw classified;
+    }
+  }
+
+  if (!args.start) throw new Error("runJsonInThread: provide `start` or `resume`");
+
+  let lastErr: unknown = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const thread = buildThread(opts);
+    try {
+      const turn = await thread.run(args.start.input, {
+        outputSchema: args.outputSchema,
+        signal: opts.signal,
+      });
+      const parsed = parseTurnJson<T>(turn.finalResponse);
+      markOk();
+      return { data: parsed, usage: turn.usage, threadId: thread.id };
+    } catch (err) {
+      lastErr = err;
+      const classified = classifyCodexError(err);
       if (classified.kind !== "generic") {
         markError(classified);
         throw classified;

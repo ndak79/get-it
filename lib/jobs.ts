@@ -30,7 +30,7 @@
  */
 
 import { CodexError } from "./codex";
-import { detectConceptsForPage } from "./agents/detect";
+import { detectConceptsForPages } from "./agents/detect";
 import { generateVizSpec } from "./agents/viz";
 import { locateAnchor } from "./pdf-extract";
 import { loadSettings } from "./settings-store";
@@ -43,7 +43,15 @@ import {
 } from "./tags-store";
 import type { DetectedConcept, VizType } from "./schemas";
 
+// Number of detection batches running concurrently. Each batch is one Codex
+// call covering up to DETECTION_BATCH_PAGES pages, so up to
+// CONCURRENCY * BATCH_PAGES pages are in flight at once — fast on long docs
+// without a burst big enough to trip the usage window.
 const DETECTION_CONCURRENCY = 3;
+const DETECTION_BATCH_PAGES = 5;
+/** Give up on a page after this many generic (non rate-limit) failures so a
+ *  persistently bad page can never wedge the job in a retry loop. */
+const MAX_DETECTION_ATTEMPTS = 2;
 const VIZ_CONCURRENCY = 4;
 const MIN_PAGE_TEXT_LEN = 120;
 
@@ -115,43 +123,53 @@ async function runDetection(docId: string) {
   const settings = loadSettings();
   const autoGenerate = settings.autoGenerate;
 
-  // What pages still need a pass? Read fresh each loop tick — a viewer
-  // poll or a manual click should never block detection from picking
-  // up the next page.
-  const pickNextPage = (): number | null => {
-    const file = loadTags(docId);
-    if (!file) return null;
-    const analyzed = new Set(file.pagesAnalyzed);
-    for (let i = 0; i < doc.extracted.numPages; i++) {
-      if (!analyzed.has(i) && !inFlightPages.has(i)) return i;
-    }
-    return null;
-  };
-
   const inFlightPages = new Set<number>();
+  // Per-page generic-failure counter (rate-limit doesn't count). A page that
+  // keeps failing is given up on (marked analyzed) once it hits the cap so
+  // the job can never spin forever.
+  const attempts = new Map<number, number>();
   let rateLimitedRetryAt: number | null = null;
   let terminalCodexError: CodexError | null = null;
+
+  // Grab the next batch of pages still needing a pass. Read fresh each tick so
+  // a concurrent poll never blocks us from picking up the next pages. Pages
+  // given up on are already in pagesAnalyzed, so they're naturally skipped.
+  const pickNextBatch = (): number[] => {
+    const file = loadTags(docId);
+    const analyzed = new Set(file?.pagesAnalyzed ?? []);
+    const batch: number[] = [];
+    for (let i = 0; i < doc.extracted.numPages && batch.length < DETECTION_BATCH_PAGES; i++) {
+      if (!analyzed.has(i) && !inFlightPages.has(i)) batch.push(i);
+    }
+    return batch;
+  };
 
   await new Promise<void>((resolve) => {
     let active = 0;
     let done = false;
 
+    const finish = () => {
+      if (active === 0 && !done) {
+        done = true;
+        resolve();
+      }
+    };
+
     const pump = () => {
       while (active < DETECTION_CONCURRENCY) {
-        const page = pickNextPage();
-        if (page == null) {
-          if (active === 0 && !done) {
-            done = true;
-            resolve();
-          }
+        if (rateLimitedRetryAt || terminalCodexError) {
+          finish();
           return;
         }
-        inFlightPages.add(page);
+        const batch = pickNextBatch();
+        if (batch.length === 0) {
+          finish();
+          return;
+        }
+        for (const p of batch) inFlightPages.add(p);
         active++;
-        analyzePage(docId, page, autoGenerate)
+        analyzeBatch(docId, batch, autoGenerate)
           .catch((e) => {
-            // Rate-limit: stop pumping more pages, schedule a retry of
-            // the whole detection job once the window clears.
             if (e instanceof CodexError && e.kind === "rate_limit" && e.retryAt) {
               rateLimitedRetryAt = e.retryAt;
             } else if (
@@ -160,23 +178,28 @@ async function runDetection(docId: string) {
             ) {
               terminalCodexError = e;
             } else {
+              // Generic failure: count it against every page in the batch and
+              // give up on those that hit the cap so we don't loop forever.
               console.warn(
-                "[jobs/detect-page]",
+                "[jobs/detect-batch]",
                 docId,
-                page,
+                batch.join(","),
                 e instanceof Error ? e.message : e,
               );
+              for (const p of batch) {
+                const n = (attempts.get(p) ?? 0) + 1;
+                attempts.set(p, n);
+                if (n >= MAX_DETECTION_ATTEMPTS) {
+                  appendDetectionResult(docId, p, [], autoGenerate);
+                }
+              }
             }
           })
           .finally(() => {
-            inFlightPages.delete(page);
+            for (const p of batch) inFlightPages.delete(p);
             active--;
             if (rateLimitedRetryAt || terminalCodexError) {
-              // Bail out of this run — schedule retry below.
-              if (active === 0 && !done) {
-                done = true;
-                resolve();
-              }
+              finish();
               return;
             }
             pump();
@@ -201,42 +224,71 @@ async function runDetection(docId: string) {
   }
 }
 
-async function analyzePage(
+/**
+ * Detect concepts for one batch of pages in a single Codex call, then persist
+ * each page's tags. Short pages skip the model entirely (still marked analyzed
+ * so we never revisit them). On success every page in the batch is marked
+ * analyzed — even those the agent returned nothing for — so detection always
+ * makes forward progress. Throws on a Codex error so the runner can apply its
+ * rate-limit / give-up policy.
+ */
+async function analyzeBatch(
   docId: string,
-  pageIndex: number,
+  pageIndices: number[],
   autoGenerate: boolean,
 ) {
   const doc = getDoc(docId);
   if (!doc) return;
-  const page = doc.extracted.pages[pageIndex];
-  if (!page) return;
-  // Skip very short pages but still mark analyzed so we don't loop on
-  // them again.
-  if (page.text.length < MIN_PAGE_TEXT_LEN) {
-    appendDetectionResult(docId, pageIndex, [], autoGenerate);
-    return;
+
+  const rich: Array<{ pageIndex: number; text: string }> = [];
+  for (const idx of pageIndices) {
+    const page = doc.extracted.pages[idx];
+    if (!page || page.text.length < MIN_PAGE_TEXT_LEN) {
+      // Out of range or too short to be worth a model call — mark analyzed.
+      appendDetectionResult(docId, idx, [], autoGenerate);
+    } else {
+      rich.push({ pageIndex: idx, text: page.text });
+    }
   }
-  const result = await detectConceptsForPage(pageIndex, page.text);
-  const concepts: DetectedConcept[] = result.concepts;
-  const newTags: PersistedTagServer[] = concepts
-    .map((c, idx) => {
-      const a = locateAnchor(page, c.anchor);
-      if (!a) return null;
-      return {
-        id: `${pageIndex}-${idx}`,
-        page: pageIndex,
-        endX: a.endX,
-        endY: a.endY,
-        fontHeight: a.fontHeight,
-        type: c.type as VizType,
-        label: c.label,
-        ready: false,
-        generating: autoGenerate,
-        concept: c,
-      };
-    })
-    .filter((t): t is PersistedTagServer => t !== null);
-  appendDetectionResult(docId, pageIndex, newTags, autoGenerate);
+  if (rich.length === 0) return;
+
+  const richSet = new Set(rich.map((r) => r.pageIndex));
+  const result = await detectConceptsForPages(rich);
+
+  // Route each concept back to its page; drop any the model mis-tagged with a
+  // page outside this batch.
+  const byPage = new Map<number, DetectedConcept[]>();
+  for (const c of result.concepts) {
+    if (!richSet.has(c.page)) continue;
+    const { page, ...rest } = c;
+    const list = byPage.get(page) ?? [];
+    list.push(rest);
+    byPage.set(page, list);
+  }
+
+  for (const { pageIndex } of rich) {
+    const page = doc.extracted.pages[pageIndex]!;
+    const concepts = byPage.get(pageIndex) ?? [];
+    const newTags: PersistedTagServer[] = concepts
+      .map((c, idx) => {
+        const a = locateAnchor(page, c.anchor);
+        if (!a) return null;
+        return {
+          id: `${pageIndex}-${idx}`,
+          page: pageIndex,
+          endX: a.endX,
+          endY: a.endY,
+          fontHeight: a.fontHeight,
+          type: c.type as VizType,
+          label: c.label,
+          ready: false,
+          generating: autoGenerate,
+          concept: c,
+        };
+      })
+      .filter((t): t is PersistedTagServer => t !== null);
+    appendDetectionResult(docId, pageIndex, newTags, autoGenerate);
+  }
 }
 
 function appendDetectionResult(

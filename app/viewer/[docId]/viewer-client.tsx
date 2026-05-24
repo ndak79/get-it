@@ -134,6 +134,51 @@ export default function ViewerClient({ docId }: { docId: string }) {
     }
   }, [docId, rightPaneMode]);
 
+  // ── Chat → knowledge-graph evaluation, batched per visit ──────────────
+  //
+  // The Chat tool no longer triggers an evaluation after every reply. Instead
+  // the student can chat freely — many messages, many threads — and we run a
+  // SINGLE evaluation pass when they leave the Chat tab (or close the doc),
+  // and only if they actually sent something while there. ChatView fires a
+  // `getit:chat-sent` event on each successful send; we just track whether one
+  // happened since we entered Chat.
+  const chatDirtyRef = useRef(false);
+  useEffect(() => {
+    const onChatSent = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { docId?: string } | undefined;
+      if (!detail || detail.docId === docId) chatDirtyRef.current = true;
+    };
+    window.addEventListener("getit:chat-sent", onChatSent);
+    return () => window.removeEventListener("getit:chat-sent", onChatSent);
+  }, [docId]);
+
+  const flushChatEval = useCallback(
+    (useKeepalive = false) => {
+      if (!chatDirtyRef.current) return;
+      chatDirtyRef.current = false;
+      void fetch(`/api/kg/${docId}/evaluate`, {
+        method: "POST",
+        keepalive: useKeepalive,
+      }).catch(() => {});
+    },
+    [docId],
+  );
+
+  // Fire when the student switches AWAY from the Chat tab.
+  const prevModeRef = useRef<RightPaneMode>(rightPaneMode);
+  useEffect(() => {
+    if (prevModeRef.current === "chat" && rightPaneMode !== "chat") {
+      flushChatEval();
+    }
+    prevModeRef.current = rightPaneMode;
+  }, [rightPaneMode, flushChatEval]);
+
+  // Fire on unmount too (navigating to Upload/Library, closing the doc) so a
+  // chat-and-leave still scores. keepalive lets the request outlive the page.
+  useEffect(() => {
+    return () => flushChatEval(true);
+  }, [flushChatEval]);
+
   // ── Bootstrap: doc meta + bump lastOpenedAt + kick KG build + start
   //    detection job + start polling. All idempotent server-side.
   useEffect(() => {
@@ -248,6 +293,12 @@ export default function ViewerClient({ docId }: { docId: string }) {
   const handleTagClick = useCallback(
     (id: string) => {
       setActiveTagId(id);
+      // Bring the Visualizer forward no matter which tool is open, so the
+      // clicked concept renders (or starts rendering) where the user can see
+      // it. Switching mode also runs the normal tab-change side effects —
+      // e.g. leaving Chat flushes a knowledge-graph evaluation (see the
+      // rightPaneMode effect above) — so it stays fully coherent.
+      setRightPaneMode("visualizer");
       const tag = tags.find((t) => t.id === id);
       if (!tag) return;
       if (tag.spec || tag.generating || tag.error) return;

@@ -75,7 +75,29 @@ step would be. Be honest — no padding praise.
 
 OUTPUT JSON matching the schema.`;
 
-function topicContext(docId: string, topic: string): string {
+function topicLineFor(topic: string): string {
+  return topic === "all"
+    ? "TOPIC THE STUDENT IS TEACHING: the whole document (no specific sub-topic — pick the most important thread)"
+    : `TOPIC THE STUDENT IS TEACHING: ${topic}`;
+}
+
+/** Lightweight context for the child-prompt turns: the curious-child agent
+ *  reacts to the student's own words, the topic and the concept map — it does
+ *  NOT need the source text. Skipping the document body here keeps every turn
+ *  small (the heaviest part of a Feynman session is its 4 turns). */
+function childContext(docId: string, topic: string): string {
+  const kg = loadKG(docId);
+  const kgPart =
+    kg && kg.status === "ready"
+      ? `\nGRAPH NODES:\n${kg.nodes.map((n) => `- ${n.label}: ${n.summary}`).join("\n")}\n`
+      : "";
+  return `${topicLineFor(topic)}\n${kgPart}`;
+}
+
+/** Full context for the end-of-session summary: it judges how faithfully the
+ *  student re-explained the material, so it gets the whole document text (no
+ *  cap — upload bounds size at MAX_PDF_PAGES). */
+function summaryContext(docId: string, topic: string): string {
   const doc = getDoc(docId);
   const kg = loadKG(docId);
   const kgPart =
@@ -83,16 +105,11 @@ function topicContext(docId: string, topic: string): string {
       ? `\nGRAPH NODES:\n${kg.nodes.map((n) => `- ${n.label}: ${n.summary}`).join("\n")}\n`
       : "";
   const docPart = doc
-    ? `DOCUMENT: ${doc.filename}\n${kgPart}DOCUMENT EXCERPT:\n${doc.extracted.pages
+    ? `DOCUMENT: ${doc.filename}\n${kgPart}DOCUMENT TEXT:\n${doc.extracted.pages
         .map((p) => `[page ${p.pageIndex + 1}]\n${p.text}`)
-        .join("\n\n")
-        .slice(0, 30_000)}`
+        .join("\n\n")}`
     : "";
-  const topicLine =
-    topic === "all"
-      ? "TOPIC THE STUDENT IS TEACHING: the whole document (no specific sub-topic — pick the most important thread)"
-      : `TOPIC THE STUDENT IS TEACHING: ${topic}`;
-  return `${topicLine}\n\n${docPart}`;
+  return `${topicLineFor(topic)}\n\n${docPart}`;
 }
 
 function renderTranscript(turns: FeynmanTurn[], pendingChildPrompt?: string): string {
@@ -108,7 +125,7 @@ function renderTranscript(turns: FeynmanTurn[], pendingChildPrompt?: string): st
 async function nextChildPrompt(docId: string, session: FeynmanSession): Promise<string> {
   const prompt = `${CHILD_SYSTEM}
 
-${topicContext(docId, session.topic)}
+${childContext(docId, session.topic)}
 
 --- TRANSCRIPT SO FAR ---
 ${renderTranscript(session.turns) || "(the student is about to start — ask an opening question that invites them to explain the topic from scratch in their own words)"}
@@ -125,7 +142,7 @@ Ask the next child prompt. JSON only.`;
 async function endingSummary(docId: string, session: FeynmanSession): Promise<string> {
   const prompt = `${SUMMARY_SYSTEM}
 
-${topicContext(docId, session.topic)}
+${summaryContext(docId, session.topic)}
 
 --- TRANSCRIPT ---
 ${renderTranscript(session.turns)}

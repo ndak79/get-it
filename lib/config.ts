@@ -6,19 +6,22 @@
  */
 
 /**
- * If true (default), the moment a page's tags come back from detection we
- * eagerly fire visualization generation for every tag in parallel — the
- * user sees the right pane fill in by itself. This is the production UX.
+ * If false (default), visualization generation is deferred: a tag's viz only
+ * fires when the user actually clicks it. This is the production UX — it keeps
+ * the user's Codex usage proportional to what they actually open, which
+ * matters a lot on long documents (a 100-page PDF can carry hundreds of tags,
+ * and eagerly rendering all of them would burn the usage window for scenes the
+ * student never looks at).
  *
- * If false, generation is deferred and only kicked off when the user
- * actually clicks a tag. Useful during dev so we don't burn tokens on
- * every page load.
+ * Set NEXT_PUBLIC_AUTO_GENERATE_VIZ="true" to opt into the eager behavior,
+ * where every tag's viz is generated in parallel as soon as detection finds
+ * it. Either way the user can flip this live from the Settings popover.
  *
- * The check uses `!== "false"` so any other value (or unset) defaults to
- * the eager / production behavior.
+ * The check uses `=== "true"` so any other value (or unset) defaults to the
+ * lazy / click-to-generate behavior.
  */
 export const AUTO_GENERATE_VIZ =
-  process.env.NEXT_PUBLIC_AUTO_GENERATE_VIZ !== "false";
+  process.env.NEXT_PUBLIC_AUTO_GENERATE_VIZ === "true";
 
 /**
  * When the visualizer fails to compile or run a generated spec (typically

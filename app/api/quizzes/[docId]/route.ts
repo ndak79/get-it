@@ -92,17 +92,19 @@ function generationPrompt(docId: string, topic: string): string {
     kg && kg.status === "ready"
       ? `\nKEY CONCEPTS:\n${kg.nodes.map((n) => `- ${n.label}: ${n.summary}`).join("\n")}\n`
       : "";
-  const excerpt = doc.extracted.pages
+  // Full document text — no excerpt cap (upload bounds size at MAX_PDF_PAGES).
+  // Stable blocks first, the variable TOPIC last for a cacheable prefix.
+  const fullText = doc.extracted.pages
     .map((p) => `[page ${p.pageIndex + 1}]\n${p.text}`)
-    .join("\n\n")
-    .slice(0, 50_000);
+    .join("\n\n");
   return `${SYSTEM}
 
 DOCUMENT: ${doc.filename}
-TOPIC: ${topic === "all" ? "the whole document — broad coverage" : topic}
 ${kgPart}
-DOCUMENT TEXT (excerpt):
-${excerpt}
+DOCUMENT TEXT:
+${fullText}
+
+TOPIC: ${topic === "all" ? "the whole document — broad coverage" : topic}
 
 Produce the quiz now. Output JSON.`;
 }

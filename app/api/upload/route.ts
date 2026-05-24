@@ -16,7 +16,15 @@
 import { NextResponse } from "next/server";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { extractPdf } from "@/lib/pdf-extract";
+import {
+  extractPdf,
+  assessPdfQuality,
+  PdfUnsupportedError,
+  MAX_PDF_PAGES,
+  type ExtractedPdf,
+  type PdfRejectReason,
+  type PdfQualityStats,
+} from "@/lib/pdf-extract";
 import { ensureDocDir, pdfPath } from "@/lib/paths";
 import { getDoc, newDocId, saveDoc } from "@/lib/store";
 
@@ -30,6 +38,29 @@ const SAMPLE_NAME_TO_DOC_ID: Record<string, string> = {
   calculus: "sample-calculus",
   chemistry: "sample-chemistry",
 };
+
+/** User-facing copy for every rejection reason. Coherent voice across the
+ *  whole gate so the UploadCard alert reads the same regardless of cause. */
+function rejectionMessage(reason: PdfRejectReason, stats?: PdfQualityStats): string {
+  switch (reason) {
+    case "too_many_pages":
+      return `This document has ${stats?.numPages ?? "too many"} pages. Get It. supports PDFs up to ${MAX_PDF_PAGES} pages — try a single chapter or a shorter export.`;
+    case "no_text":
+      return "This PDF has almost no selectable text. Get It. reads the text layer of a document, not pictures of pages — this looks like a scan or an image-only export. Try a digital, text-based PDF (one where you can select the text in a reader).";
+    case "image_dominant":
+      return `This looks like a scanned or image-heavy PDF — only ${stats?.textPages ?? 0} of ${stats?.numPages ?? 0} pages have a usable text layer. Get It. reads text, not images, so too much of this document would be lost. Try a digital, text-based PDF.`;
+    case "unreadable":
+    default:
+      return "This PDF couldn't be read — it may be encrypted, password-protected, or corrupted. Try re-exporting it or removing protection, then upload again.";
+  }
+}
+
+function rejectResponse(reason: PdfRejectReason, stats?: PdfQualityStats) {
+  return NextResponse.json(
+    { error: rejectionMessage(reason, stats), code: reason, stats },
+    { status: 422 },
+  );
+}
 
 export async function POST(req: Request) {
   let buffer: Buffer;
@@ -84,14 +115,37 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "not a PDF" }, { status: 400 });
   }
 
-  const docId = presetDocId ?? newDocId();
-  ensureDocDir(docId);
-  await fs.writeFile(pdfPath(docId), buffer);
-
+  // Extract FIRST, from the in-memory bytes, so we can gate the document
+  // before writing anything to disk or kicking off any agent workflow. A
+  // rejected upload leaves no orphan files behind.
+  //
   // pdf.js refuses Buffer instances; copy to a plain Uint8Array.
   const u8 = new Uint8Array(buffer.byteLength);
   u8.set(buffer);
-  const extracted = await extractPdf(u8);
+  let extracted: ExtractedPdf;
+  try {
+    extracted = await extractPdf(u8);
+  } catch (e) {
+    if (e instanceof PdfUnsupportedError) {
+      return rejectResponse(e.reason, e.stats);
+    }
+    // pdf.js throws on encrypted / corrupt files — surface a friendly hint
+    // instead of a 500.
+    return rejectResponse("unreadable");
+  }
+
+  // Text-coverage gate. Samples are curated and known-good, so they skip it;
+  // real uploads must carry enough machine-readable text to study from.
+  if (!presetDocId) {
+    const quality = assessPdfQuality(extracted);
+    if (!quality.ok) {
+      return rejectResponse(quality.reason as PdfRejectReason, quality.stats);
+    }
+  }
+
+  const docId = presetDocId ?? newDocId();
+  ensureDocDir(docId);
+  await fs.writeFile(pdfPath(docId), buffer);
   const pdfUrl = `/api/pdf/${docId}`;
 
   saveDoc({

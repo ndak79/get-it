@@ -19,6 +19,8 @@ import {
   SquareFunction,
   Network,
   BookOpen,
+  AlertTriangle,
+  X,
 } from "lucide-react";
 
 type FeatureColor = "rose" | "amber" | "emerald" | "violet" | "sky";
@@ -248,6 +250,31 @@ export default function UploadCard() {
         </p>
       </div>
 
+      {/* Upload error / rejected-document alert — prominent, right under the
+          drop zone so the cause is obvious the moment a bad PDF is refused. */}
+      {error && (
+        <div
+          role="alert"
+          className="mt-5 flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3.5"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-semibold text-rose-900">
+              We couldn&rsquo;t open this document
+            </p>
+            <p className="mt-1 text-[12.5px] leading-relaxed text-rose-800">{error}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            className="-mr-1 -mt-1 shrink-0 rounded-md p-1 text-rose-400 transition hover:bg-rose-100 hover:text-rose-700"
+            aria-label="Dismiss"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Library — only render if there's actually something to show */}
       {libraryPreview.length > 0 && (
         <div className="mt-12">
@@ -353,10 +380,6 @@ export default function UploadCard() {
           })}
         </div>
       </div>
-
-      {error && (
-        <p className="mt-6 text-center text-sm text-rose-600">{error}</p>
-      )}
     </div>
   );
 }

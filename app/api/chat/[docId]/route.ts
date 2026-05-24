@@ -14,7 +14,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { runJson } from "@/lib/codex";
+import { runJsonInThread, CodexError } from "@/lib/codex";
 import { getDoc } from "@/lib/store";
 import {
   loadWorkContext,
@@ -24,7 +24,6 @@ import {
 } from "@/lib/work-context";
 import { chatReplySchema, type ChatReplyResult } from "@/lib/schemas-kg";
 import { loadKG } from "@/lib/kg";
-import { scheduleEvaluation } from "@/lib/kg-runner";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -58,12 +57,14 @@ function docContext(docId: string): string {
         .map((n) => `- ${n.label}: ${n.summary}`)
         .join("\n")}\n`
     : "";
-  // Cap excerpt to keep prompts manageable; full text is on disk.
-  const excerpt = doc.extracted.pages
+  // Full document text — no excerpt cap. Upload caps the document at
+  // MAX_PDF_PAGES, and the conversation runs on a persistent Codex thread, so
+  // this whole block is sent ONCE on the first turn and reused (cached) for
+  // every later turn rather than re-sent each message.
+  const fullText = doc.extracted.pages
     .map((p) => `[page ${p.pageIndex + 1}]\n${p.text}`)
-    .join("\n\n")
-    .slice(0, 60_000);
-  return `DOCUMENT: ${doc.filename}\n${kgPart}\nDOCUMENT TEXT (excerpt):\n${excerpt}`;
+    .join("\n\n");
+  return `DOCUMENT: ${doc.filename}\n${kgPart}\nDOCUMENT TEXT:\n${fullText}`;
 }
 
 function renderHistory(messages: ChatMessage[]): string {
@@ -128,28 +129,68 @@ export async function POST(
     }
     saveWorkContext(wc);
 
-    const prompt = `${SYSTEM}\n\n${docContext(docId)}\n\n--- CONVERSATION SO FAR ---\n${renderHistory(
-      chat.messages,
-    )}\n\n--- ASSISTANT REPLY ---\nReply now as ASSISTANT. Output JSON.`;
+    // The new turn the student just typed — all that needs to go over the
+    // wire when resuming an existing Codex thread.
+    const turnInput = `STUDENT: ${message}\n\n--- ASSISTANT REPLY ---\nReply now as ASSISTANT. Output JSON.`;
 
-    const { data } = await runJson<ChatReplyResult>(prompt, chatReplySchema, {
-      reasoning: "low",
-    });
+    let reply: ChatReplyResult | null = null;
+    let codexThreadId: string | null = chat.codexThreadId ?? null;
+
+    // Resume the conversation's native Codex thread when we have one: the
+    // document + prior turns already live in that thread, so we send only the
+    // new message (guaranteed prefix-cache hit, a fraction of the tokens).
+    if (chat.codexThreadId) {
+      try {
+        const { data, threadId } = await runJsonInThread<ChatReplyResult>({
+          outputSchema: chatReplySchema,
+          opts: { reasoning: "low" },
+          resume: { threadId: chat.codexThreadId, input: turnInput },
+        });
+        reply = data;
+        codexThreadId = threadId ?? chat.codexThreadId;
+      } catch (e) {
+        // Rate-limit / auth / binary: let the health banner take over.
+        if (e instanceof CodexError && e.kind !== "generic") throw e;
+        // Generic failure (e.g. the session expired / was evicted from
+        // ~/.codex/sessions): fall through and rebuild a fresh thread with
+        // full context so the answer never silently degrades.
+        reply = null;
+      }
+    }
+
+    // No thread yet (first turn) or the resume failed: open a fresh thread and
+    // seed it with the full context — system prompt + whole document + the
+    // conversation so far. Stable prefix first, the latest turn last.
+    if (!reply) {
+      const fullInput = `${SYSTEM}\n\n${docContext(docId)}\n\n--- CONVERSATION SO FAR ---\n${renderHistory(
+        chat.messages,
+      )}\n\n--- ASSISTANT REPLY ---\nReply now as ASSISTANT. Output JSON.`;
+      const { data, threadId } = await runJsonInThread<ChatReplyResult>({
+        outputSchema: chatReplySchema,
+        opts: { reasoning: "low" },
+        start: { input: fullInput },
+      });
+      reply = data;
+      codexThreadId = threadId;
+    }
 
     const reloaded = loadWorkContext(docId);
     const liveChat = reloaded.chats.find((c) => c.id === chat.id);
     if (!liveChat) return NextResponse.json({ error: "chat vanished" }, { status: 500 });
     const assistantMsg: ChatMessage = {
       role: "assistant",
-      content: data.reply,
+      content: reply.reply,
       ts: Date.now(),
     };
     liveChat.messages.push(assistantMsg);
     liveChat.updatedAt = assistantMsg.ts;
+    if (codexThreadId) liveChat.codexThreadId = codexThreadId;
     saveWorkContext(reloaded);
 
-    // Re-score the graph in the background.
-    scheduleEvaluation(docId);
+    // NB: the knowledge-graph evaluation is intentionally NOT scheduled here.
+    // The client triggers a single pass when the student leaves the Chat tab
+    // (see viewer-client), so a multi-message, multi-thread chat session costs
+    // exactly one evaluation instead of one per reply.
 
     return NextResponse.json({
       chat: liveChat,

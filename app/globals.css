@@ -300,13 +300,23 @@ html[data-platform="win32"] .tab-bar {
   cursor: wait;
   opacity: 0.75;
 }
-/* Manual mode — concept detected but not yet generated. Softer + clickable. */
+/* Detected but not yet generated — keeps the full type colour + icon (a not-
+   yet-rendered tag should look just as good as a ready one), clickable to
+   generate its visualization. */
 .tag-pill[data-state="idle"] {
-  opacity: 0.65;
   cursor: pointer;
 }
-.tag-pill[data-state="idle"]:hover {
-  opacity: 1;
+/* Generated and ready to view — a subtle emerald ring reads as "ready, click
+   to open". The 1px white separator keeps the ring legible even on the
+   emerald-toned "Source" tag. Type colour and icon are left untouched. */
+.tag-pill[data-state="ready"] {
+  box-shadow: 0 0 0 1px #fff, 0 0 0 2.5px #059669;
+}
+.tag-pill[data-state="ready"]:hover:not([aria-disabled="true"]) {
+  box-shadow:
+    0 0 0 1px #fff,
+    0 0 0 2.5px #059669,
+    0 1px 4px rgba(17, 17, 19, 0.08);
 }
 .tag-pill[data-active="true"] {
   outline: 2px solid var(--ink-900);

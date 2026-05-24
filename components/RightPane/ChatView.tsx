@@ -142,6 +142,12 @@ export default function ChatView({ docId }: Props) {
       setChats((prev) =>
         prev ? prev.map((c) => (c.id === chatId ? j.chat : c)) : prev,
       );
+      // Tell the viewer a reply landed. It batches a single knowledge-graph
+      // evaluation when the student leaves the Chat tab, instead of one per
+      // message.
+      window.dispatchEvent(
+        new CustomEvent("getit:chat-sent", { detail: { docId } }),
+      );
     } catch (e) {
       // Roll back optimistic and surface a placeholder system message.
       setChats((prev) =>
@@ -233,7 +239,7 @@ export default function ChatView({ docId }: Props) {
               <MessageSquare className="mx-auto mb-3 h-7 w-7 text-[var(--ink-400)]" />
               <p className="text-[13.5px] leading-relaxed text-[var(--ink-500)]">
                 Ask anything about this document. Each conversation is saved and feeds the
-                knowledge graph evaluator after every reply.
+                knowledge graph evaluator when you leave the Chat tab.
               </p>
             </div>
           </div>

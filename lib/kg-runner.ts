@@ -29,7 +29,11 @@ import {
   type KGBuildResult,
   type KGEvaluateResult,
 } from "./schemas-kg";
-import { loadWorkContext, summariseForEvaluator } from "./work-context";
+import {
+  loadWorkContext,
+  summariseForEvaluator,
+  hasInteractionsSince,
+} from "./work-context";
 
 // ── Build prompt ──────────────────────────────────────────────────────
 
@@ -70,6 +74,9 @@ Return ONE JSON object matching the schema. No prose.`;
 
 function buildPrompt(filename: string, pageBlobs: string[]): string {
   const text = pageBlobs.join("\n\n");
+  // Stable instruction prefix first, variable document body last — keeps the
+  // prompt prefix-cacheable and lets the model anchor on the rubric before it
+  // reads the source.
   return `${BUILD_SYSTEM}
 
 --- DOCUMENT (filename: ${filename}) ---
@@ -77,26 +84,17 @@ ${text}
 --- END DOCUMENT ---`;
 }
 
-// Bound the prompt so we don't accidentally exceed the model's context on
-// monster PDFs. Each page is also truncated individually so the agent sees
-// every page (even if shallowly) rather than only the first few in full.
-const MAX_PROMPT_CHARS = 90_000;
-const MAX_PER_PAGE_CHARS = 4_000;
-
+/**
+ * Pack every page in full — no per-page or total character cap. The upload
+ * gate (MAX_PDF_PAGES) is what bounds document size now; truncating here would
+ * mean the graph silently ignores later chapters, which is exactly the
+ * long-document failure we're fixing. The whole text goes to the model so the
+ * concept graph covers the document end to end.
+ */
 function packPages(pages: { pageIndex: number; text: string }[]): string[] {
-  const trimmed = pages.map((p) => {
-    const t = p.text.trim();
-    const slice = t.length > MAX_PER_PAGE_CHARS ? t.slice(0, MAX_PER_PAGE_CHARS) + "…" : t;
-    return `[page ${p.pageIndex + 1}]\n${slice}`;
-  });
-  let total = 0;
-  const out: string[] = [];
-  for (const blob of trimmed) {
-    if (total + blob.length > MAX_PROMPT_CHARS) break;
-    out.push(blob);
-    total += blob.length + 2;
-  }
-  return out;
+  return pages
+    .map((p) => `[page ${p.pageIndex + 1}]\n${p.text.trim()}`)
+    .filter((blob) => blob.length > 0);
 }
 
 // ── Public: build ────────────────────────────────────────────────────
@@ -236,11 +234,18 @@ You must score, per concept, four 0–100 parameters:
       that pose a fresh scenario (not a definition) and the student answers
       correctly are real application evidence.
 
+HOW THE INPUT IS FRAMED
+You are given each concept's CURRENT four scores (the baseline, in parens) and
+ONLY the interactions that happened SINCE the last evaluation. The baseline
+already encodes everything the student proved earlier, so you never need the
+older transcript — just decide, from the new evidence, where a score should
+rise. Treat the current scores as the floor.
+
 CRITICAL RULES
 1. Scores are MONOTONE NON-DECREASING across evaluations — a student can
    only progress, never regress. Engine-side we will clamp any decrease,
    so your job is to NEVER decrease, only raise scores when there is fresh
-   evidence.
+   evidence. A concept with no new evidence keeps its current score.
 2. Be RIGOROUS. Quantity of interactions does NOT entitle a high score —
    only quality of evidence does. A student who has done 50 flashcards but
    rates them all "again", or who has scored 1/8 on every quiz, should sit
@@ -282,9 +287,9 @@ ${edgesSummary}
 
 GLOBAL NOTE (previous): ${kg.globalNote}
 
---- WORK CONTEXT (chronological) ---
+--- NEW INTERACTIONS SINCE LAST EVALUATION (chronological) ---
 ${workCtxText}
---- END WORK CONTEXT ---
+--- END NEW INTERACTIONS ---
 
 Score now. Only emit nodes with new evidence. Never decrease.`;
 }
@@ -358,14 +363,12 @@ async function runEvaluation(docId: string): Promise<void> {
   if (!kg || kg.status !== "ready") return;
   const workCtx = loadWorkContext(docId);
 
-  const hasInteractions =
-    workCtx.chats.length > 0 ||
-    workCtx.flashcards.length > 0 ||
-    workCtx.quizzes.length > 0 ||
-    workCtx.feynman.length > 0;
-  if (!hasInteractions) return;
+  // Only the interactions since the last pass matter — the baseline scores
+  // carry everything earlier. If nothing is new, don't spend a Codex call.
+  const sinceTs = kg.lastEvaluatedAt;
+  if (!hasInteractionsSince(workCtx, sinceTs)) return;
 
-  const promptText = evaluatePrompt(kg, summariseForEvaluator(workCtx));
+  const promptText = evaluatePrompt(kg, summariseForEvaluator(workCtx, sinceTs));
   const { data } = await runJson<KGEvaluateResult>(promptText, kgEvaluateSchema, {
     reasoning: "medium",
   });

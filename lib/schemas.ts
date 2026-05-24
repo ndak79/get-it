@@ -50,6 +50,47 @@ export const detectionSchema = {
   },
 } as const;
 
+// ── Batched tag detection (several pages per call) ─────────────────────
+// Same per-concept shape as above plus a `page` field so the caller can
+// route each concept's anchor back to the right page. The detection job
+// sends a small batch of pages at once to cut the number of Codex calls on
+// long documents without changing per-page concept quality.
+
+export type DetectedConceptForPage = DetectedConcept & {
+  /** 0-based page index this concept was found on (echoes the PAGE_INDEX
+   *  marker the agent was given). */
+  page: number;
+};
+
+export type DetectionBatchResult = {
+  concepts: DetectedConceptForPage[];
+};
+
+export const detectionBatchSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["concepts"],
+  properties: {
+    concepts: {
+      type: "array",
+      // Up to ~4-5 concepts per page over a small batch.
+      maxItems: 28,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["page", "label", "type", "anchor", "context"],
+        properties: {
+          page: { type: "integer", minimum: 0 },
+          label: { type: "string", minLength: 2, maxLength: 50 },
+          type: { type: "string", enum: VIZ_TYPES as unknown as string[] },
+          anchor: { type: "string", minLength: 12, maxLength: 200 },
+          context: { type: "string", minLength: 30, maxLength: 600 },
+        },
+      },
+    },
+  },
+} as const;
+
 // ── Visualization spec (per concept) ───────────────────────────────────
 
 export type ThreeDSpec = {

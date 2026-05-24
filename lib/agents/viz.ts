@@ -28,15 +28,14 @@ language as the source. Match it exactly — Italian PDF → Italian outputs,
 English PDF → English outputs, Spanish PDF → Spanish outputs. Code
 identifiers and JS comments stay in English.`;
 
-const PROMPTS: Record<
-  VizType,
-  (ctx: { label: string; context: string; docTitle?: string }) => string
-> = {
-  "3d": ({ label, context, docTitle }) => `You are Get It.'s visualizer 3D scene generator.
-
-CONCEPT: ${label}
-FIELD: ${docTitle ?? "general"}
-CONTEXT: ${context}
+/**
+ * Per-type prompt HEADS — pure constants (no interpolation). Kept first in
+ * the final prompt so that every call of a given viz type shares a byte-
+ * identical prefix and hits the model's prompt cache; the per-concept details
+ * (label / field / context) are appended at the very end by `composePrompt`.
+ */
+const PROMPT_HEADS: Record<VizType, string> = {
+  "3d": `You are Get It.'s visualizer 3D scene generator.
 
 ${LANGUAGE_RULE}
 
@@ -72,15 +71,9 @@ CONSTRAINTS:
   - Material colors should read clearly against #fafafa (avoid pure white
     surfaces; prefer mid-tone fills with subtle MeshStandardMaterial).
   - Every '(' must close with ')', every '{' with '}', every '[' with ']'.
-    The body must end with the closing brace of its outermost function.
+    The body must end with the closing brace of its outermost function.`,
 
-Reply with the JSON object only.`,
-
-  "2d-anim": ({ label, context, docTitle }) => `You are Get It.'s visualizer 2D Canvas animation generator.
-
-CONCEPT: ${label}
-FIELD: ${docTitle ?? "general"}
-CONTEXT: ${context}
+  "2d-anim": `You are Get It.'s visualizer 2D Canvas animation generator.
 
 ${LANGUAGE_RULE}
 
@@ -116,15 +109,9 @@ CONSTRAINTS:
   - Use only 'ctx' (CanvasRenderingContext2D) plus Math globals.
   - Restart the animation cleanly when 'time' resets to 0.
   - Use plain string concatenation ('foo ' + x) NOT template literals
-    (\`foo \${x}\`) — backticks tend to get mangled in JSON encoding.
+    (\`foo \${x}\`) — backticks tend to get mangled in JSON encoding.`,
 
-Reply with the JSON object only.`,
-
-  formula: ({ label, context, docTitle }) => `You are Get It.'s visualizer formula generator.
-
-CONCEPT: ${label}
-FIELD: ${docTitle ?? "general"}
-CONTEXT: ${context}
+  formula: `You are Get It.'s visualizer formula generator.
 
 ${LANGUAGE_RULE}
 
@@ -133,15 +120,9 @@ Produce a JSON object matching the schema:
   - steps: 2 to 6 derivation/explanation steps, each with one LaTeX line
     plus a one-sentence explanation. Walk the reader from definition to
     result.
-Avoid \\begin{align} environments unless necessary; prefer simple lines.
+Avoid \\begin{align} environments unless necessary; prefer simple lines.`,
 
-Reply with the JSON object only.`,
-
-  graph: ({ label, context, docTitle }) => `You are Get It.'s visualizer graph generator.
-
-CONCEPT: ${label}
-FIELD: ${docTitle ?? "general"}
-CONTEXT: ${context}
+  graph: `You are Get It.'s visualizer graph generator.
 
 ${LANGUAGE_RULE}
 
@@ -158,15 +139,9 @@ chart_type and fill data_json accordingly:
 Pick sensible domain & sampling. Make the chart visually communicate the
 concept (e.g. range R = v0² sin(2α)/g plotted as α sweeps 0 to 90; or the
 bell curve; or a parabola). Use color hex strings; the chart engine
-renders on a white background.
+renders on a white background.`,
 
-Reply with the JSON object only.`,
-
-  "2d-text": ({ label, context, docTitle }) => `You are Get It.'s visualizer text-source generator.
-
-CONCEPT: ${label}
-FIELD: ${docTitle ?? "general"}
-CONTEXT: ${context}
+  "2d-text": `You are Get It.'s visualizer text-source generator.
 
 ${LANGUAGE_RULE}
 
@@ -178,10 +153,23 @@ stable URLs (Wikipedia, official government sites, arxiv, etc).
 If you have web search available, use it to confirm the citation text and
 URL; otherwise produce the best high-confidence quote you know. Prefer
 direct quotation in italics for legal articles. Add bracketed source
-labels in the text like [1], [2] linking to the citations array order.
-
-Reply with the JSON object only.`,
+labels in the text like [1], [2] linking to the citations array order.`,
 };
+
+/** Append the per-concept block to a type's constant head. Variable content
+ *  goes LAST so the head stays a cacheable prefix across calls. */
+function composePrompt(
+  type: VizType,
+  ctx: { label: string; context: string; docTitle?: string },
+): string {
+  return `${PROMPT_HEADS[type]}
+
+CONCEPT: ${ctx.label}
+FIELD: ${ctx.docTitle ?? "general"}
+CONTEXT: ${ctx.context}
+
+Reply with the JSON object only.`;
+}
 
 function repairPreamble(prevSpec: VizSpec, runtimeError: string): string {
   const codeField =
@@ -228,7 +216,7 @@ export type GenerateVizArgs = {
 
 export async function generateVizSpec(args: GenerateVizArgs): Promise<VizSpec> {
   const schema = vizSchemaFor(args.type);
-  const basePrompt = PROMPTS[args.type]({
+  const basePrompt = composePrompt(args.type, {
     label: args.label,
     context: args.context,
     docTitle: args.docTitle,

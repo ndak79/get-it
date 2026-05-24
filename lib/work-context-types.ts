@@ -17,6 +17,12 @@ export type ChatThread = {
   createdAt: number;
   updatedAt: number;
   messages: ChatMessage[];
+  /** Native Codex thread id backing this conversation. Set on the first
+   *  assistant turn; later turns resume it and send only the new message
+   *  (the document + prior turns stay in the Codex thread). Absent on
+   *  pre-existing chats and after a session is lost — both fall back to a
+   *  fresh full-context turn. */
+  codexThreadId?: string;
 };
 
 export type Flashcard = {
