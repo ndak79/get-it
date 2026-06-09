@@ -173,7 +173,7 @@ export default function UploadCard() {
         Drop a PDF. Its hardest concepts come alive inline as you read.
         Chat with it, drill yourself, explain it back to a curious
         eight-year-old. Watch a map of what you actually understand
-        grow — concept by concept, not page by page.
+        grow, concept by concept, not page by page.
       </p>
 
       {/* Drop zone — output-type badges + CTA button */}
